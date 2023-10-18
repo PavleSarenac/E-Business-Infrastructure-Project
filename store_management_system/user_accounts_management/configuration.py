@@ -1,6 +1,6 @@
 import os
 
-DATABASE_URL = "CHANGE THIS !!!!!!!!!" if ("PRODUCTION" in os.environ) else "localhost"
+DATABASE_URL = "authenticationDatabase" if ("PRODUCTION" in os.environ) else "localhost"
 
 
 class Configuration:

@@ -7,8 +7,7 @@ application = Flask(__name__)
 application.config.from_object(Configuration)
 
 
-@application.route("/register_customer", methods=["POST"])
-def register():
+def registration(userRole):
     forename = request.json.get("forename", "")
     surname = request.json.get("surname", "")
     email = request.json.get("email", "")
@@ -39,13 +38,24 @@ def register():
     if userWithSameEmailAddress:
         return jsonify(message="Email already exists."), 400
 
-    user = User(email=email, password=password, forename=forename, surname=surname, roleId=1)
+    userRoleId = 1 if (userRole == "customer") else 3
+    user = User(email=email, password=password, forename=forename, surname=surname, roleId=userRoleId)
     database.session.add(user)
     database.session.commit()
 
     return Response(status=200)
 
 
+@application.route("/register_customer", methods=["POST"])
+def registerCustomer():
+    return registration("customer")
+
+
+@application.route("/register_courier", methods=["POST"])
+def registerCourier():
+    return registration("courier")
+
+
 if __name__ == "__main__":
     database.init_app(application)
-    application.run(debug=True)
+    application.run(debug=True, host="0.0.0.0", port=5001)

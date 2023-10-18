@@ -1,0 +1,32 @@
+version: "3.8"
+
+services:
+  authenticationDatabase:
+    image: mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      timeout: 10s
+      retries: 10
+  adminer:
+    image: adminer
+    ports:
+      - "8080:8080"
+  authenticationDatabaseMigration:
+    image: authenticationdatabasemigration
+    environment:
+      - DATABASE_URL=authenticationDatabase
+      - PRODUCTION=True
+    depends_on:
+      authenticationDatabase:
+        condition: service_healthy
+  authentication:
+    image: authentication
+    environment:
+      - DATABASE_URL=authenticationDatabase
+      - PRODUCTION=True
+    depends_on:
+      - authenticationDatabaseMigration
+    ports:
+      - "5001:5001"
