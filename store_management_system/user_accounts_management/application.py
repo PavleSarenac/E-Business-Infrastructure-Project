@@ -2,9 +2,16 @@ from flask import Flask, request, Response, jsonify
 from configuration import Configuration
 from models import database, User
 import re
+from sqlalchemy import and_
+from flask_jwt_extended import JWTManager, create_access_token
+
+CUSTOMER_ROLE_ID = 1
+COURIER_ROLE_ID = 3
 
 application = Flask(__name__)
 application.config.from_object(Configuration)
+
+jwt = JWTManager(application)
 
 
 def registration(userRole):
@@ -38,7 +45,7 @@ def registration(userRole):
     if userWithSameEmailAddress:
         return jsonify(message="Email already exists."), 400
 
-    userRoleId = 1 if (userRole == "customer") else 3
+    userRoleId = CUSTOMER_ROLE_ID if userRole == "customer" else COURIER_ROLE_ID
     user = User(email=email, password=password, forename=forename, surname=surname, roleId=userRoleId)
     database.session.add(user)
     database.session.commit()
@@ -56,6 +63,36 @@ def registerCourier():
     return registration("courier")
 
 
+@application.route("/login", methods=["POST"])
+def login():
+    email = request.json.get("email", "")
+    password = request.json.get("password", "")
+
+    isEmailEmpty = len(email) == 0
+    isPasswordEmpty = len(password) == 0
+
+    if isEmailEmpty:
+        return jsonify(message="Field email is missing."), 400
+    if isPasswordEmpty:
+        return jsonify(message="Field password is missing."), 400
+
+    email_pattern = r'^[\w\.-]+@[\w\.-]+\.\w+'
+    if not re.match(email_pattern, email):
+        return jsonify(message="Invalid email."), 400
+
+    user = User.query.filter(and_(User.email == email, User.password == password)).first()
+    if not user:
+        return jsonify(message="Invalid credentials."), 400
+
+    additionalClaims = {
+        "forename": user.forename,
+        "surname": user.surname,
+        "password": user.password
+    }
+    accessToken = create_access_token(identity=user.email, additional_claims=additionalClaims)
+    return jsonify(accessToken=accessToken), 200
+
+
 if __name__ == "__main__":
     database.init_app(application)
-    application.run(debug=True, host="0.0.0.0", port=5001)
+    application.run(debug=True, host=Configuration.HOST, port=Configuration.AUTHENTICATION_APPLICATION_PORT)
