@@ -4,7 +4,6 @@ from datetime import timedelta
 
 class Configuration:
     HOST = "0.0.0.0" if "PRODUCTION" in os.environ else "localhost"
-
     AUTHENTICATION_APPLICATION_PORT = 5001
 
     DATABASE_URL = os.environ["DATABASE_URL"] if "DATABASE_URL" in os.environ else "localhost"

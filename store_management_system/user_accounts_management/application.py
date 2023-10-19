@@ -3,7 +3,7 @@ from configuration import Configuration
 from models import database, User
 import re
 from sqlalchemy import and_
-from flask_jwt_extended import JWTManager, create_access_token
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 
 CUSTOMER_ROLE_ID = 1
 COURIER_ROLE_ID = 3
@@ -91,6 +91,18 @@ def login():
     }
     accessToken = create_access_token(identity=user.email, additional_claims=additionalClaims)
     return jsonify(accessToken=accessToken), 200
+
+
+@application.route("/delete", methods=["POST"])
+@jwt_required()
+def deleteUser():
+    userAccessTokenIdentity = get_jwt_identity()
+    user = User.query.filter(User.email == userAccessTokenIdentity).first()
+    if not user:
+        return jsonify(message="Unknown user."), 400
+    database.session.delete(user)
+    database.session.commit()
+    return Response(status=200)
 
 
 if __name__ == "__main__":
