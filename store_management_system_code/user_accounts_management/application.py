@@ -34,7 +34,7 @@ def registration(userRole):
     if isPasswordEmpty:
         return jsonify(message="Field password is missing."), 400
 
-    email_pattern = r'^[\w\.-]+@[\w\.-]+\.\w+'
+    email_pattern = r'^[\w\.-]+@[\w\.-]+\.(com|org|net|edu|gov|mil|io|co\.uk)$'
     if not re.match(email_pattern, email):
         return jsonify(message="Invalid email."), 400
 
@@ -76,7 +76,7 @@ def login():
     if isPasswordEmpty:
         return jsonify(message="Field password is missing."), 400
 
-    email_pattern = r'^[\w\.-]+@[\w\.-]+\.\w+'
+    email_pattern = r'^[\w\.-]+@[\w\.-]+\.(com|org|net|edu|gov|mil|io|co\.uk)$'
     if not re.match(email_pattern, email):
         return jsonify(message="Invalid email."), 400
 
@@ -87,7 +87,8 @@ def login():
     additionalClaims = {
         "forename": user.forename,
         "surname": user.surname,
-        "password": user.password
+        "password": user.password,
+        "roleId": str(user.roleId)
     }
     accessToken = create_access_token(identity=user.email, additional_claims=additionalClaims)
     return jsonify(accessToken=accessToken), 200
