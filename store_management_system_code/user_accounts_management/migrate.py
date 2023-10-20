@@ -18,7 +18,7 @@ database.init_app(application)
 
 with application.app_context() as context:
     init()
-    migrate(message="Initial production migration.")
+    migrate(message="Authentication database initial production migration.")
     upgrade()
 
     customerRole = Role(roleDescription="customer")
