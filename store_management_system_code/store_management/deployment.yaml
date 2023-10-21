@@ -1,0 +1,38 @@
+version: "3.8"
+
+services:
+  storeDatabase:
+    image: mysql
+    ports:
+      - "3307:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      timeout: 10s
+      retries: 10
+  adminer:
+    image: adminer
+    ports:
+      - "8081:8080"
+  storeDatabaseMigration:
+    image: storedatabasemigration
+    environment:
+      - PRODUCTION=True
+      - DATABASE_URL=storeDatabase
+      - DATABASE_USERNAME=root
+      - DATABASE_PASSWORD=root
+    depends_on:
+      storeDatabase:
+        condition: service_healthy
+  owner:
+    image: owner
+    ports:
+      - "5001:5001"
+    environment:
+      - PRODUCTION=True
+      - DATABASE_URL=storeDatabase
+      - DATABASE_USERNAME=root
+      - DATABASE_PASSWORD=root
+    depends_on:
+      - storeDatabaseMigration
