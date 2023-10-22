@@ -56,7 +56,7 @@ def update():
                 database.session.commit()
             if not ProductCategory.query.filter(
                     and_(ProductCategory.productId == productObject.id,
-                         ProductCategory.categoryId == categoryObject.id)):
+                         ProductCategory.categoryId == categoryObject.id)).first():
                 productCategoryObject = ProductCategory(productId=productObject.id, categoryId=categoryObject.id)
                 database.session.add(productCategoryObject)
                 database.session.commit()

@@ -36,3 +36,14 @@ services:
       - DATABASE_PASSWORD=root
     depends_on:
       - storeDatabaseMigration
+  customer:
+    image: customer
+    ports:
+      - "5002:5002"
+    environment:
+      - PRODUCTION=True
+      - DATABASE_URL=storeDatabase
+      - DATABASE_USERNAME=root
+      - DATABASE_PASSWORD=root
+    depends_on:
+      - storeDatabaseMigration
