@@ -3,6 +3,7 @@ from configuration import Configuration
 from models import database, Product, Category, Order, ProductOrder
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt
 from datetime import datetime, timezone
+from sqlalchemy import and_
 
 application = Flask(__name__)
 application.config.from_object(Configuration)
@@ -87,12 +88,43 @@ def order():
     for currentRequest in requests:
         newProductOrder = ProductOrder(
             productId=currentRequest["id"],
-            orderId=newOrder.id
+            orderId=newOrder.id,
+            quantity=currentRequest["quantity"]
         )
         database.session.add(newProductOrder)
         database.session.commit()
 
     return jsonify({"id": newOrder.id}), 200
+
+
+@application.route("/status", methods=["GET"])
+@jwt_required()
+def status():
+    jwtToken = get_jwt()
+    if jwtToken["roleId"] != "1":
+        return jsonify(msg="Missing Authorization Header"), 401
+
+    response = {
+        "orders": []
+    }
+    allOrders = Order.query.all()
+    for currentOrder in allOrders:
+        newOrder = dict()
+        newOrder["products"] = []
+        for product in currentOrder.products:
+            newProduct = dict()
+            newProduct["categories"] = [category.categoryName for category in product.categories]
+            newProduct["name"] = product.productName
+            newProduct["price"] = product.productPrice
+            newProduct["quantity"] = ProductOrder.query.filter(
+                and_(ProductOrder.productId == product.id, ProductOrder.orderId == currentOrder.id)
+            ).first().quantity
+            newOrder["products"].append(newProduct)
+        newOrder["price"] = currentOrder.totalOrderPrice
+        newOrder["status"] = currentOrder.orderStatus
+        newOrder["timestamp"] = currentOrder.orderCreationTime
+        response["orders"].append(newOrder)
+    return jsonify(response), 200
 
 
 if __name__ == "__main__":

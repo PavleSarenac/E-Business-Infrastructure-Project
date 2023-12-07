@@ -17,6 +17,7 @@ class ProductOrder(database.Model):
     id = database.Column(database.Integer, primary_key=True)
     productId = database.Column(database.Integer, database.ForeignKey("products.id"), nullable=False)
     orderId = database.Column(database.Integer, database.ForeignKey("orders.id"), nullable=False)
+    quantity = database.Column(database.Integer, nullable=False)
 
 
 class Product(database.Model):
