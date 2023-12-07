@@ -2,3 +2,6 @@ Lib/
 Scripts/
 pyvenv.cfg
 .idea/
+store_management_system_code/user_accounts_management/__pycache__/
+store_management_system_tests/__pycache__/
+store_management_system_tests/temp.csv

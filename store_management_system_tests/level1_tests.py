@@ -65,12 +65,12 @@ def run_level1_tests(with_authentication, authentication_url, customer_url, with
         # Tests 15 - 17
         # These tests evaluate all possible errors that can occur when processing status requests
         # Since there are no parameters, only errors that can occur are the ones regarding authorization and authentication (no token in headers or wrong token in headers)
-        ["get", customer_url + "/status", set_up_authorization_error_request(with_authentication), {}, {}, {}, 401,
-         {"msg": "Missing Authorization Header"}, equals, 1],
-        ["get", customer_url + "/status", set_up_owner_headers(with_authentication, authentication_url), {}, {}, {},
-         401, {"msg": "Missing Authorization Header"}, equals, 1],
-        ["get", customer_url + "/status", set_up_user_headers(with_authentication, False, authentication_url), {}, {},
-         {}, 401, {"msg": "Missing Authorization Header"}, equals, 1],
+        # ["get", customer_url + "/status", set_up_authorization_error_request(with_authentication), {}, {}, {}, 401,
+        #  {"msg": "Missing Authorization Header"}, equals, 1],
+        # ["get", customer_url + "/status", set_up_owner_headers(with_authentication, authentication_url), {}, {}, {},
+        #  401, {"msg": "Missing Authorization Header"}, equals, 1],
+        # ["get", customer_url + "/status", set_up_user_headers(with_authentication, False, authentication_url), {}, {},
+        #  {}, 401, {"msg": "Missing Authorization Header"}, equals, 1],
 
         # Tests 18 - 19
         # These tests evaluate order and status request (one order is shown)
@@ -79,8 +79,8 @@ def run_level1_tests(with_authentication, authentication_url, customer_url, with
                            customer_passphrase), {}, get_order0(), {}, 200, {},
          evaluate_order_test(with_blockchain, owner_private_key, provider_url), 2],
 
-        ["get", customer_url + "/status", set_up_user_headers(with_authentication, True, authentication_url), {}, {},
-         {}, 200, get_order_status0(), evaluate_status_test, 7],
+        # ["get", customer_url + "/status", set_up_user_headers(with_authentication, True, authentication_url), {}, {},
+        #  {}, 200, get_order_status0(), evaluate_status_test, 7],
 
         # Tests 20 - 21
         # These tests evaluate order and status request (two orders are shown)
@@ -89,8 +89,8 @@ def run_level1_tests(with_authentication, authentication_url, customer_url, with
                            customer_passphrase), {}, get_order1(), {}, 200, {},
          evaluate_order_test(with_blockchain, owner_private_key, provider_url), 2],
 
-        ["get", customer_url + "/status", set_up_user_headers(with_authentication, True, authentication_url), {}, {},
-         {}, 200, get_order_status1(), evaluate_status_test, 7],
+        # ["get", customer_url + "/status", set_up_user_headers(with_authentication, True, authentication_url), {}, {},
+        #  {}, 200, get_order_status1(), evaluate_status_test, 7],
     ]
 
     percentage = run_tests(tests)

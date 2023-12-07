@@ -1,7 +1,8 @@
 from flask import Flask, request, jsonify
 from configuration import Configuration
-from models import database, Product, Category
+from models import database, Product, Category, Order, ProductOrder
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt
+from datetime import datetime, timezone
 
 application = Flask(__name__)
 application.config.from_object(Configuration)
@@ -43,6 +44,55 @@ def search():
                 "price": product.productPrice
             })
     return jsonify(resultDictionary), 200
+
+
+@application.route("/order", methods=["POST"])
+@jwt_required()
+def order():
+    jwtToken = get_jwt()
+    if jwtToken["roleId"] != "1":
+        return jsonify(msg="Missing Authorization Header"), 401
+
+    requests = request.json.get("requests", "null")
+    if requests == "null":
+        return jsonify(message="Field requests is missing."), 400
+    requestNumber = 0
+    for currentRequest in requests:
+        if "id" not in currentRequest:
+            return jsonify(message="Product id is missing for request number " + str(requestNumber) + "."), 400
+        if "quantity" not in currentRequest:
+            return jsonify(message="Product quantity is missing for request number " + str(requestNumber) + "."), 400
+        if type(currentRequest["id"]) is not int or currentRequest["id"] <= 0:
+            return jsonify(message="Invalid product id for request number " + str(requestNumber) + "."), 400
+        if type(currentRequest["quantity"]) is not int or currentRequest["quantity"] <= 0:
+            return jsonify(message="Invalid product quantity for request number " + str(requestNumber) + "."), 400
+        if not Product.query.filter(Product.id == currentRequest["id"]).first():
+            return jsonify(message="Invalid product for request number " + str(requestNumber) + "."), 400
+        requestNumber += 1
+
+    totalOrderPrice = 0
+    for currentRequest in requests:
+        currentProduct = Product.query.filter(Product.id == currentRequest["id"]).first()
+        totalOrderPrice += currentRequest["quantity"] * currentProduct.productPrice
+    orderStatus = "CREATED"
+    orderCreationTime = datetime.now(timezone.utc).isoformat()
+    newOrder = Order(
+        totalOrderPrice=totalOrderPrice,
+        orderStatus=orderStatus,
+        orderCreationTime=orderCreationTime
+    )
+    database.session.add(newOrder)
+    database.session.commit()
+
+    for currentRequest in requests:
+        newProductOrder = ProductOrder(
+            productId=currentRequest["id"],
+            orderId=newOrder.id
+        )
+        database.session.add(newProductOrder)
+        database.session.commit()
+
+    return jsonify({"id": newOrder.id}), 200
 
 
 if __name__ == "__main__":

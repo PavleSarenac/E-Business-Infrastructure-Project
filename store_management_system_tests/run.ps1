@@ -5,8 +5,8 @@
 
 # python main.py --help
 # python main.py --type "authentication" --authentication-url "http://127.0.0.1:5000" --jwt-secret "JWT_SECRET_KEY" --roles-field "roleId" --owner-role "2" --customer-role "1" --courier-role "3"
-python main.py --type "level0" --with-authentication --authentication-url "http://127.0.0.1:5000" --owner-url "http://127.0.0.1:5001" --customer-url "http://127.0.0.1:5002"
-# python main.py --type level1 --with-authentication --authentication-url http://127.0.0.1:5000 --owner-url http://127.0.0.1:5001 --customer-url http://127.0.0.1:5002
+# python main.py --type "level0" --with-authentication --authentication-url "http://127.0.0.1:5000" --owner-url "http://127.0.0.1:5001" --customer-url "http://127.0.0.1:5002"
+python main.py --type level1 --with-authentication --authentication-url "http://127.0.0.1:5000" --owner-url "http://127.0.0.1:5001" --customer-url "http://127.0.0.1:5002"
 
 # PAZI PISALI SU NA GRUPI DA IMA NEKI PROBLEM SA TESTOVIMA LEVEL2 NEKO JE REKAO DA MOZDA RESI PROBLEM DODAVANJE ROLA KAO U
 # TESTU ZA AUTENTIKACIJU: (--jwt-secret "JWT_SECRET_KEY" --roles-field "roleId" --owner-role "2" --customer-role "1" --courier-role "3")
