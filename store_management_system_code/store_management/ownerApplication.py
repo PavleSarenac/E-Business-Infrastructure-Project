@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, Response
 from configuration import Configuration
-from models import database, Product, Category, ProductCategory
+from models import database, Product, Category, ProductCategory, Order, ProductOrder
 from sqlalchemy import and_
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt
 
@@ -62,6 +62,48 @@ def update():
                 database.session.commit()
 
     return Response(status=200)
+
+
+@application.route("/product_statistics", methods=["GET"])
+@jwt_required()
+def product_statistics():
+    jwtToken = get_jwt()
+    if jwtToken["roleId"] != "2":
+        return jsonify(msg="Missing Authorization Header"), 401
+
+    products = dict()
+    allOrders = Order.query.all()
+    for order in allOrders:
+        for product in order.products:
+            productName = product.productName
+            productQuantity = ProductOrder.query.filter(and_(
+                ProductOrder.productId == product.id,
+                ProductOrder.orderId == order.id
+            )).first().quantity
+            if productName not in products.keys():
+                products[productName] = {"sold": 0, "waiting": 0}
+            if order.orderStatus == "COMPLETE":
+                products[productName]["sold"] += productQuantity
+            else:
+                products[productName]["waiting"] += productQuantity
+    response = {
+        "statistics": []
+    }
+    for productName, statistics in products.items():
+        response["statistics"].append({
+            "name": productName,
+            "sold": statistics["sold"],
+            "waiting": statistics["waiting"]
+        })
+    return jsonify(response), 200
+
+
+@application.route("/category_statistics", methods=["GET"])
+@jwt_required()
+def category_statistics():
+    jwtToken = get_jwt()
+    if jwtToken["roleId"] != "2":
+        return jsonify(msg="Missing Authorization Header"), 401
 
 
 if __name__ == "__main__":
