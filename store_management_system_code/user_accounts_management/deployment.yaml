@@ -8,9 +8,10 @@ services:
     environment:
       - MYSQL_ROOT_PASSWORD=root
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      test: [ "CMD-SHELL", "mysqladmin ping -h localhost -u root -proot" ]
       timeout: 10s
-      retries: 30
+      retries: 40
+      start_period: 25s
   adminer:
     image: adminer
     ports:

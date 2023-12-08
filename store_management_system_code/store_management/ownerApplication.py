@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, Response
 from configuration import Configuration
 from models import database, Product, Category, ProductCategory, Order, ProductOrder
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt
 
 application = Flask(__name__)
@@ -104,6 +104,36 @@ def category_statistics():
     jwtToken = get_jwt()
     if jwtToken["roleId"] != "2":
         return jsonify(msg="Missing Authorization Header"), 401
+
+    categories = dict()
+    allCategories = Category.query.all()
+    for category in allCategories:
+        if category.categoryName not in categories:
+            categories[category.categoryName] = 0
+        quantity = database.session.query(
+            func.sum(ProductOrder.quantity)
+        ).join(
+            ProductCategory, ProductOrder.productId == ProductCategory.productId
+        ).join(
+            Order, ProductOrder.orderId == Order.id
+        ).filter(
+            and_(
+                ProductCategory.categoryId == category.id,
+                Order.orderStatus == "COMPLETE"
+            )
+        ).group_by(
+            ProductCategory.categoryId
+        ).scalar()
+        if quantity:
+            categories[category.categoryName] += quantity
+    sortedCategories = dict(sorted(categories.items(), key=lambda item: (-item[1], item[0])))
+    response = {
+        "statistics": []
+    }
+    for categoryName in sortedCategories:
+        response["statistics"].append(categoryName)
+
+    return jsonify(response), 200
 
 
 if __name__ == "__main__":

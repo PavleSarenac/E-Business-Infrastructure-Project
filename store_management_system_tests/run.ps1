@@ -8,8 +8,8 @@
 # python main.py --type "level0" --with-authentication --authentication-url "http://127.0.0.1:5000" --owner-url "http://127.0.0.1:5001" --customer-url "http://127.0.0.1:5002"
 # python main.py --type "level1" --with-authentication --authentication-url "http://127.0.0.1:5000" --owner-url "http://127.0.0.1:5001" --customer-url "http://127.0.0.1:5002"
 # python main.py --type "level2" --with-authentication --authentication-url "http://127.0.0.1:5000" --owner-url "http://127.0.0.1:5001" --customer-url "http://127.0.0.1:5002" --courier-url "http://127.0.0.1:5003"
-python main.py --type "level3" --with-authentication --authentication-url "http://127.0.0.1:5000" --owner-url "http://127.0.0.1:5001" --customer-url "http://127.0.0.1:5002" --courier-url "http://127.0.0.1:5003"
-# python main.py --type "all" --authentication-url "http://127.0.0.1:5000" --jwt-secret "JWT_SECRET_KEY" --roles-field "roleId" --owner-role "2" --customer-role "1" --courier-role "3" --with-authentication --owner-url "http://127.0.0.1:5001" --customer-url "http://127.0.0.1:5002" --courier-url "http://127.0.0.1:5003"
+# python main.py --type "level3" --with-authentication --authentication-url "http://127.0.0.1:5000" --owner-url "http://127.0.0.1:5001" --customer-url "http://127.0.0.1:5002" --courier-url "http://127.0.0.1:5003"
+python main.py --type "all" --authentication-url "http://127.0.0.1:5000" --jwt-secret "JWT_SECRET_KEY" --roles-field "roleId" --owner-role "2" --customer-role "1" --courier-role "3" --with-authentication --owner-url "http://127.0.0.1:5001" --customer-url "http://127.0.0.1:5002" --courier-url "http://127.0.0.1:5003"
 
 # TESTS WITH BLOCKCHAIN
 
