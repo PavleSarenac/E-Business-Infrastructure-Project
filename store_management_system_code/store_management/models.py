@@ -42,7 +42,8 @@ class Order(database.Model):
     __tablename__ = "orders"
     id = database.Column(database.Integer, primary_key=True)
     totalOrderPrice = database.Column(Float, nullable=False)
-    orderStatus = database.Column(database.String(32), nullable=False)
+    orderStatus = database.Column(database.String(256), nullable=False)
     orderCreationTime = database.Column(DateTime, nullable=False)
+    buyerEmail = database.Column(database.String(256), nullable=False)
 
     products = database.relationship("Product", secondary=ProductOrder.__table__, back_populates="orders")

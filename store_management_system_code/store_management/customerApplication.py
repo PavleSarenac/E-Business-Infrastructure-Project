@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
 from configuration import Configuration
 from models import database, Product, Category, Order, ProductOrder
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt
@@ -75,12 +75,12 @@ def order():
     for currentRequest in requests:
         currentProduct = Product.query.filter(Product.id == currentRequest["id"]).first()
         totalOrderPrice += currentRequest["quantity"] * currentProduct.productPrice
-    orderStatus = "CREATED"
     orderCreationTime = datetime.now(timezone.utc).isoformat()
     newOrder = Order(
         totalOrderPrice=totalOrderPrice,
-        orderStatus=orderStatus,
-        orderCreationTime=orderCreationTime
+        orderStatus="CREATED",
+        orderCreationTime=orderCreationTime,
+        buyerEmail=jwtToken["email"]
     )
     database.session.add(newOrder)
     database.session.commit()
@@ -125,6 +125,30 @@ def status():
         newOrder["timestamp"] = currentOrder.orderCreationTime
         response["orders"].append(newOrder)
     return jsonify(response), 200
+
+
+@application.route("/delivered", methods=["POST"])
+@jwt_required()
+def delivered():
+    jwtToken = get_jwt()
+    if jwtToken["roleId"] != "1":
+        return jsonify(msg="Missing Authorization Header"), 401
+
+    orderId = request.json.get("id", "null")
+    if orderId == "null":
+        return jsonify(message="Missing order id."), 400
+    if type(orderId) is not int or orderId <= 0:
+        return jsonify(message="Invalid order id."), 400
+    if not Order.query.filter(Order.id == orderId).first():
+        return jsonify(message="Invalid order id."), 400
+    orderStatus = Order.query.filter(Order.id == orderId).first().orderStatus
+    if orderStatus != "PENDING":
+        return jsonify(message="Invalid order id."), 400
+    _order = Order.query.filter(Order.id == orderId).first()
+    _order.orderStatus = "COMPLETE"
+    database.session.commit()
+
+    return Response(status=200)
 
 
 if __name__ == "__main__":

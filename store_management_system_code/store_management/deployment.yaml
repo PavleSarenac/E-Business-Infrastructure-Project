@@ -10,7 +10,7 @@ services:
     healthcheck:
       test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
       timeout: 10s
-      retries: 10
+      retries: 30
   adminer:
     image: adminer
     ports:
@@ -40,6 +40,17 @@ services:
     image: customer
     ports:
       - "5002:5002"
+    environment:
+      - PRODUCTION=True
+      - DATABASE_URL=storeDatabase
+      - DATABASE_USERNAME=root
+      - DATABASE_PASSWORD=root
+    depends_on:
+      - storeDatabaseMigration
+  courier:
+    image: courier
+    ports:
+      - "5003:5003"
     environment:
       - PRODUCTION=True
       - DATABASE_URL=storeDatabase

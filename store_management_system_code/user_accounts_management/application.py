@@ -87,6 +87,7 @@ def login():
     additionalClaims = {
         "forename": user.forename,
         "surname": user.surname,
+        "email": user.email,
         "password": user.password,
         "roleId": str(user.roleId)
     }
