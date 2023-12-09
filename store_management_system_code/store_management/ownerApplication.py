@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, Response
 from configuration import Configuration
 from models import database, Product, Category, ProductCategory, Order, ProductOrder
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, case
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt
 
 OWNER_ROLE_ID_STRING = "2"
@@ -110,14 +110,53 @@ def processFile(postRequestBody):
     return productCategoriesDictionary, "", 0
 
 
+def validateUpdateRequest():
+    jwtToken = get_jwt()
+    if jwtToken["roleId"] != OWNER_ROLE_ID_STRING:
+        return "Missing Authorization Header", 401
+    if "file" not in request.files:
+        return "Field file missing.", 400
+    return "", 0
+
+
+def validateProductStatisticsRequest():
+    jwtToken = get_jwt()
+    if jwtToken["roleId"] != OWNER_ROLE_ID_STRING:
+        return "Missing Authorization Header", 401
+    return "", 0
+
+
+def getProductStatistics():
+    productStatistics = database.session.query(
+        Product.productName,
+        func.sum(case([(Order.orderStatus == "COMPLETE", ProductOrder.quantity)], else_=0)).label("sold"),
+        func.sum(case([(Order.orderStatus != "COMPLETE", ProductOrder.quantity)], else_=0)).label("waiting")
+    ).join(
+        ProductOrder, Product.id == ProductOrder.productId
+    ).join(
+        Order, Order.id == ProductOrder.orderId
+    ).group_by(
+        Product.productName
+    ).all()
+
+    response = {"statistics": []}
+    for productStats in productStatistics:
+        response["statistics"].append({
+            "name": productStats[0],
+            "sold": int(productStats[1]),
+            "waiting": int(productStats[2])
+        })
+    return response
+
+
 @application.route("/update", methods=["POST"])
 @jwt_required()
 def update():
-    jwtToken = get_jwt()
-    if jwtToken["roleId"] != OWNER_ROLE_ID_STRING:
-        return jsonify(msg="Missing Authorization Header"), 401
-    if "file" not in request.files:
-        return jsonify(message="Field file missing."), 400
+    errorMessage, errorCode = validateUpdateRequest()
+    if len(errorMessage) > 0 and errorCode == 400:
+        return jsonify(message=errorMessage), errorCode
+    if len(errorMessage) > 0 and errorCode == 401:
+        return jsonify(msg=errorMessage), errorCode
 
     productCategoriesDictionary, errorMessage, errorCode = processFile(request)
     if len(errorMessage) > 0:
@@ -133,35 +172,10 @@ def update():
 @application.route("/product_statistics", methods=["GET"])
 @jwt_required()
 def product_statistics():
-    jwtToken = get_jwt()
-    if jwtToken["roleId"] != OWNER_ROLE_ID_STRING:
-        return jsonify(msg="Missing Authorization Header"), 401
-
-    products = dict()
-    allOrders = Order.query.all()
-    for order in allOrders:
-        for product in order.products:
-            productName = product.productName
-            productQuantity = ProductOrder.query.filter(and_(
-                ProductOrder.productId == product.id,
-                ProductOrder.orderId == order.id
-            )).first().quantity
-            if productName not in products.keys():
-                products[productName] = {"sold": 0, "waiting": 0}
-            if order.orderStatus == "COMPLETE":
-                products[productName]["sold"] += productQuantity
-            else:
-                products[productName]["waiting"] += productQuantity
-    response = {
-        "statistics": []
-    }
-    for productName, statistics in products.items():
-        response["statistics"].append({
-            "name": productName,
-            "sold": statistics["sold"],
-            "waiting": statistics["waiting"]
-        })
-    return jsonify(response), 200
+    errorMessage, errorCode = validateProductStatisticsRequest()
+    if len(errorMessage) > 0:
+        return jsonify(msg=errorMessage), errorCode
+    return jsonify(getProductStatistics()), 200
 
 
 @application.route("/category_statistics", methods=["GET"])
