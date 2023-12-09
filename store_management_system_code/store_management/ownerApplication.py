@@ -32,12 +32,12 @@ def insertProducts(productCategoriesDictionary):
 
 
 def getNewCategoryObjects(productCategoriesDictionary):
-    allCategorieNamesFromDatabase = [category.categoryName for category in Category.query.all()]
+    allCategoryNamesFromDatabase = [category.categoryName for category in Category.query.all()]
     newCategoryNames = set()
     newCategoryObjects = []
     for categoryObjects in productCategoriesDictionary.values():
         for categoryObject in categoryObjects:
-            if categoryObject.categoryName not in allCategorieNamesFromDatabase \
+            if categoryObject.categoryName not in allCategoryNamesFromDatabase \
                     and categoryObject.categoryName not in newCategoryNames:
                 newCategoryNames.add(categoryObject.categoryName)
                 newCategoryObjects.append(categoryObject)
@@ -56,27 +56,28 @@ def insertCategories(productCategoriesDictionary):
             for addedCategory in addedCategories:
                 if categoryObject.categoryName == addedCategory.categoryName:
                     categoryObject.id = addedCategory.id
+                    break
     return productCategoriesDictionary
 
 
 def getNewProductCategoryObjects(productCategoriesDictionary):
     allProductCategoriesFromDatabase = \
         [(productCategory.productId, productCategory.categoryId) for productCategory in ProductCategory.query.all()]
-    newProductCategoriesTuples = set()
-    newProductCategoriesObjects = []
+    newProductCategoryTuples = set()
+    newProductCategoryObjects = []
     for productObject, categoryObjects in productCategoriesDictionary.items():
         for categoryObject in categoryObjects:
             currentTuple = (productObject.id, categoryObject.id)
             if currentTuple not in allProductCategoriesFromDatabase \
-                    and currentTuple not in newProductCategoriesTuples:
-                newProductCategoriesTuples.add(currentTuple)
-                newProductCategoriesObjects.append(
+                    and currentTuple not in newProductCategoryTuples:
+                newProductCategoryTuples.add(currentTuple)
+                newProductCategoryObjects.append(
                     ProductCategory(
                         productId=currentTuple[0],
                         categoryId=currentTuple[1]
                     )
                 )
-    return newProductCategoriesObjects
+    return newProductCategoryObjects
 
 
 def insertProductCategories(productCategoriesDictionary):
