@@ -4,6 +4,8 @@ from models import database, Product, Category, ProductCategory, Order, ProductO
 from sqlalchemy import and_, func
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt
 
+OWNER_ROLE_ID_STRING = "2"
+
 application = Flask(__name__)
 application.config.from_object(Configuration)
 
@@ -83,34 +85,42 @@ def insertProductCategories(productCategoriesDictionary):
     database.session.commit()
 
 
-@application.route("/update", methods=["POST"])
-@jwt_required()
-def update():
-    jwtToken = get_jwt()
-    if jwtToken["roleId"] != "2":
-        return jsonify(msg="Missing Authorization Header"), 401
-    if "file" not in request.files:
-        return jsonify(message="Field file missing."), 400
-
-    productsFileContent = request.files["file"].stream.read().decode()
-    lineNumber = 0
+def processFile(postRequestBody):
+    productsFileContent = postRequestBody.files["file"].stream.read().decode()
     productCategoriesDictionary = dict()
+    lineNumber = 0
     allProductNamesInDatabase = [product.productName for product in Product.query.all()]
 
     for line in productsFileContent.split("\n"):
         splittedLine = line.split(",")
         if len(splittedLine) != 3:
-            return jsonify(message=f"Incorrect number of values on line {lineNumber}."), 400
+            return productCategoriesDictionary, f"Incorrect number of values on line {lineNumber}.", 400
         productCategories, productName, productPrice = splittedLine[0], splittedLine[1], splittedLine[2]
         if not (isFloat(productPrice) and float(productPrice) > 0.0):
-            return jsonify(message=f"Incorrect price on line {lineNumber}."), 400
+            return productCategoriesDictionary, f"Incorrect price on line {lineNumber}.", 400
         if productName in allProductNamesInDatabase \
                 or productName in [product.productName for product in productCategoriesDictionary.keys()]:
-            return jsonify(message=f"Product {productName} already exists."), 400
+            return productCategoriesDictionary, f"Product {productName} already exists.", 400
         productObject = Product(productName=productName, productPrice=productPrice)
         productCategoriesDictionary[productObject] = \
             [Category(categoryName=categoryName) for categoryName in productCategories.split("|")]
         lineNumber += 1
+
+    return productCategoriesDictionary, "", 0
+
+
+@application.route("/update", methods=["POST"])
+@jwt_required()
+def update():
+    jwtToken = get_jwt()
+    if jwtToken["roleId"] != OWNER_ROLE_ID_STRING:
+        return jsonify(msg="Missing Authorization Header"), 401
+    if "file" not in request.files:
+        return jsonify(message="Field file missing."), 400
+
+    productCategoriesDictionary, errorMessage, errorCode = processFile(request)
+    if len(errorMessage) > 0:
+        return jsonify(message=errorMessage), errorCode
 
     productCategoriesDictionary = insertProducts(productCategoriesDictionary)
     productCategoriesDictionary = insertCategories(productCategoriesDictionary)
@@ -123,7 +133,7 @@ def update():
 @jwt_required()
 def product_statistics():
     jwtToken = get_jwt()
-    if jwtToken["roleId"] != "2":
+    if jwtToken["roleId"] != OWNER_ROLE_ID_STRING:
         return jsonify(msg="Missing Authorization Header"), 401
 
     products = dict()
@@ -157,7 +167,7 @@ def product_statistics():
 @jwt_required()
 def category_statistics():
     jwtToken = get_jwt()
-    if jwtToken["roleId"] != "2":
+    if jwtToken["roleId"] != OWNER_ROLE_ID_STRING:
         return jsonify(msg="Missing Authorization Header"), 401
 
     categories = dict()
