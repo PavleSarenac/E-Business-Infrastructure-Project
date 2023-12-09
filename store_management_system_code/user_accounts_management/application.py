@@ -20,18 +20,13 @@ def registration(userRole):
     email = request.json.get("email", "")
     password = request.json.get("password", "")
 
-    isForenameEmpty = len(forename) == 0
-    isSurnameEmpty = len(surname) == 0
-    isEmailEmpty = len(email) == 0
-    isPasswordEmpty = len(password) == 0
-
-    if isForenameEmpty:
+    if len(forename) == 0:
         return jsonify(message="Field forename is missing."), 400
-    if isSurnameEmpty:
+    if len(surname) == 0:
         return jsonify(message="Field surname is missing."), 400
-    if isEmailEmpty:
+    if len(email) == 0:
         return jsonify(message="Field email is missing."), 400
-    if isPasswordEmpty:
+    if len(password) == 0:
         return jsonify(message="Field password is missing."), 400
 
     email_pattern = r'^[\w\.-]+@[\w\.-]+\.(com|org|net|edu|gov|mil|io|co\.uk)$'
@@ -41,12 +36,18 @@ def registration(userRole):
     if len(password) < 8:
         return jsonify(message="Invalid password."), 400
 
-    userWithSameEmailAddress = User.query.filter(User.email == email).first()
-    if userWithSameEmailAddress:
+    userAlreadyRegistered = User.query.filter(User.email == email).first()
+    if userAlreadyRegistered:
         return jsonify(message="Email already exists."), 400
 
     userRoleId = CUSTOMER_ROLE_ID if userRole == "customer" else COURIER_ROLE_ID
-    user = User(email=email, password=password, forename=forename, surname=surname, roleId=userRoleId)
+    user = User(
+        email=email,
+        password=password,
+        forename=forename,
+        surname=surname,
+        roleId=userRoleId
+    )
     database.session.add(user)
     database.session.commit()
 
@@ -68,26 +69,25 @@ def login():
     email = request.json.get("email", "")
     password = request.json.get("password", "")
 
-    isEmailEmpty = len(email) == 0
-    isPasswordEmpty = len(password) == 0
-
-    if isEmailEmpty:
+    if len(email) == 0:
         return jsonify(message="Field email is missing."), 400
-    if isPasswordEmpty:
+    if len(password) == 0:
         return jsonify(message="Field password is missing."), 400
 
     email_pattern = r'^[\w\.-]+@[\w\.-]+\.(com|org|net|edu|gov|mil|io|co\.uk)$'
     if not re.match(email_pattern, email):
         return jsonify(message="Invalid email."), 400
 
-    user = User.query.filter(and_(User.email == email, User.password == password)).first()
+    user = User.query.filter(and_(
+        User.email == email,
+        User.password == password
+    )).first()
     if not user:
         return jsonify(message="Invalid credentials."), 400
 
     additionalClaims = {
         "forename": user.forename,
         "surname": user.surname,
-        "email": user.email,
         "password": user.password,
         "roleId": str(user.roleId)
     }
@@ -98,8 +98,7 @@ def login():
 @application.route("/delete", methods=["POST"])
 @jwt_required()
 def deleteUser():
-    userAccessTokenIdentity = get_jwt_identity()
-    user = User.query.filter(User.email == userAccessTokenIdentity).first()
+    user = User.query.filter(User.email == get_jwt_identity()).first()
     if not user:
         return jsonify(message="Unknown user."), 400
     database.session.delete(user)

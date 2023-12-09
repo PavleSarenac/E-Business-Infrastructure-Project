@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, Response
 from configuration import Configuration
 from models import database, Product, Category, Order, ProductOrder
-from flask_jwt_extended import JWTManager, jwt_required, get_jwt
+from flask_jwt_extended import JWTManager, jwt_required, get_jwt, get_jwt_identity
 from datetime import datetime, timezone
 from sqlalchemy import and_
 
@@ -80,7 +80,7 @@ def order():
         totalOrderPrice=totalOrderPrice,
         orderStatus="CREATED",
         orderCreationTime=orderCreationTime,
-        buyerEmail=jwtToken["email"]
+        buyerEmail=get_jwt_identity()
     )
     database.session.add(newOrder)
     database.session.commit()

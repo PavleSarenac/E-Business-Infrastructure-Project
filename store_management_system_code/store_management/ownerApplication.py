@@ -18,6 +18,71 @@ def isFloat(stringRepresentation):
         return False
 
 
+def insertProducts(productCategoriesDictionary):
+    database.session.bulk_save_objects(list(productCategoriesDictionary.keys()))
+    database.session.commit()
+    addedProducts = Product.query.filter(
+        Product.productName.in_([product.productName for product in productCategoriesDictionary.keys()])
+    ).all()
+    for productObject, addedProduct in zip(productCategoriesDictionary.keys(), addedProducts):
+        productObject.id = addedProduct.id
+    return productCategoriesDictionary
+
+
+def getNewCategoryObjects(productCategoriesDictionary):
+    allCategorieNamesFromDatabase = [category.categoryName for category in Category.query.all()]
+    newCategoryNames = set()
+    newCategoryObjects = []
+    for categoryObjects in productCategoriesDictionary.values():
+        for categoryObject in categoryObjects:
+            if categoryObject.categoryName not in allCategorieNamesFromDatabase \
+                    and categoryObject.categoryName not in newCategoryNames:
+                newCategoryNames.add(categoryObject.categoryName)
+                newCategoryObjects.append(categoryObject)
+    return newCategoryObjects
+
+
+def insertCategories(productCategoriesDictionary):
+    newCategoryObjects = getNewCategoryObjects(productCategoriesDictionary)
+    database.session.bulk_save_objects(newCategoryObjects)
+    database.session.commit()
+    addedCategories = Category.query.filter(
+        Category.categoryName.in_([category.categoryName for category in newCategoryObjects])
+    ).all()
+    for productObject, categoryObjects in productCategoriesDictionary.items():
+        for categoryObject in categoryObjects:
+            for addedCategory in addedCategories:
+                if categoryObject.categoryName == addedCategory.categoryName:
+                    categoryObject.id = addedCategory.id
+    return productCategoriesDictionary
+
+
+def getNewProductCategoryObjects(productCategoriesDictionary):
+    allProductCategoriesFromDatabase = \
+        [(productCategory.productId, productCategory.categoryId) for productCategory in ProductCategory.query.all()]
+    newProductCategoriesTuples = set()
+    newProductCategoriesObjects = []
+    for productObject, categoryObjects in productCategoriesDictionary.items():
+        for categoryObject in categoryObjects:
+            currentTuple = (productObject.id, categoryObject.id)
+            if currentTuple not in allProductCategoriesFromDatabase \
+                    and currentTuple not in newProductCategoriesTuples:
+                newProductCategoriesTuples.add(currentTuple)
+                newProductCategoriesObjects.append(
+                    ProductCategory(
+                        productId=currentTuple[0],
+                        categoryId=currentTuple[1]
+                    )
+                )
+    return newProductCategoriesObjects
+
+
+def insertProductCategories(productCategoriesDictionary):
+    newProductCategoryObjects = getNewProductCategoryObjects(productCategoriesDictionary)
+    database.session.bulk_save_objects(newProductCategoryObjects)
+    database.session.commit()
+
+
 @application.route("/update", methods=["POST"])
 @jwt_required()
 def update():
@@ -26,9 +91,11 @@ def update():
         return jsonify(msg="Missing Authorization Header"), 401
     if "file" not in request.files:
         return jsonify(message="Field file missing."), 400
+
     productsFileContent = request.files["file"].stream.read().decode()
     lineNumber = 0
     productCategoriesDictionary = dict()
+    allProductNamesInDatabase = [product.productName for product in Product.query.all()]
 
     for line in productsFileContent.split("\n"):
         splittedLine = line.split(",")
@@ -37,29 +104,17 @@ def update():
         productCategories, productName, productPrice = splittedLine[0], splittedLine[1], splittedLine[2]
         if not (isFloat(productPrice) and float(productPrice) > 0.0):
             return jsonify(message=f"Incorrect price on line {lineNumber}."), 400
-        if Product.query.filter(Product.productName == productName).first():
+        if productName in allProductNamesInDatabase \
+                or productName in [product.productName for product in productCategoriesDictionary.keys()]:
             return jsonify(message=f"Product {productName} already exists."), 400
         productObject = Product(productName=productName, productPrice=productPrice)
-        productCategoriesDictionary[productObject] = []
-        for categoryName in productCategories.split("|"):
-            productCategoriesDictionary[productObject].append(categoryName)
+        productCategoriesDictionary[productObject] = \
+            [Category(categoryName=categoryName) for categoryName in productCategories.split("|")]
         lineNumber += 1
 
-    for productObject, categoriesNames in productCategoriesDictionary.items():
-        database.session.add(productObject)
-        database.session.commit()
-        for categoryName in categoriesNames:
-            categoryObject = Category.query.filter(Category.categoryName == categoryName).first()
-            if not categoryObject:
-                categoryObject = Category(categoryName=categoryName)
-                database.session.add(categoryObject)
-                database.session.commit()
-            if not ProductCategory.query.filter(
-                    and_(ProductCategory.productId == productObject.id,
-                         ProductCategory.categoryId == categoryObject.id)).first():
-                productCategoryObject = ProductCategory(productId=productObject.id, categoryId=categoryObject.id)
-                database.session.add(productCategoryObject)
-                database.session.commit()
+    productCategoriesDictionary = insertProducts(productCategoriesDictionary)
+    productCategoriesDictionary = insertCategories(productCategoriesDictionary)
+    insertProductCategories(productCategoriesDictionary)
 
     return Response(status=200)
 
