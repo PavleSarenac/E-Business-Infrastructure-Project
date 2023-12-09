@@ -11,12 +11,14 @@ application.config.from_object(Configuration)
 jwt = JWTManager(application)
 
 
-@application.route("/search", methods=["GET"])
-@jwt_required()
-def search():
+def validateSearchRequest():
     jwtToken = get_jwt()
     if jwtToken["roleId"] != "1":
-        return jsonify(msg="Missing Authorization Header"), 401
+        return "Missing Authorization Header", 401
+    return "", 0
+
+
+def getSearchResult():
     resultDictionary = {
         "categories": [],
         "products": []
@@ -44,7 +46,16 @@ def search():
                 "name": product.productName,
                 "price": product.productPrice
             })
-    return jsonify(resultDictionary), 200
+    return resultDictionary
+
+
+@application.route("/search", methods=["GET"])
+@jwt_required()
+def search():
+    errorMessage, errorCode = validateSearchRequest()
+    if len(errorMessage) > 0:
+        return jsonify(msg=errorMessage), errorCode
+    return jsonify(getSearchResult()), 200
 
 
 @application.route("/order", methods=["POST"])
