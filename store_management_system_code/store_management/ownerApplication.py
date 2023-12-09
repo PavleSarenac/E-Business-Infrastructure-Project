@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, Response
 from configuration import Configuration
 from models import database, Product, Category, ProductCategory, Order, ProductOrder
-from sqlalchemy import and_, func, case
+from sqlalchemy import func, case, desc, asc
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt
 
 OWNER_ROLE_ID_STRING = "2"
@@ -146,6 +146,37 @@ def getProductStatistics():
             "sold": int(productStats[1]),
             "waiting": int(productStats[2])
         })
+
+    return response
+
+
+def validateCategoryStatisticsRequest():
+    jwtToken = get_jwt()
+    if jwtToken["roleId"] != OWNER_ROLE_ID_STRING:
+        return "Missing Authorization Header", 401
+    return "", 0
+
+
+def getCategoryStatistics():
+    categories = database.session.query(
+        Category.categoryName.label("CategoryName"),
+        func.sum(case([(Order.orderStatus == "COMPLETE", ProductOrder.quantity)], else_=0)).label("Quantity")
+    ).outerjoin(
+        ProductCategory, Category.id == ProductCategory.categoryId
+    ).outerjoin(
+        ProductOrder, ProductCategory.productId == ProductOrder.productId
+    ).outerjoin(
+        Order, ProductOrder.orderId == Order.id
+    ).group_by(
+        "CategoryName"
+    ).order_by(
+        desc("Quantity"), asc("CategoryName")
+    ).all()
+
+    response = {"statistics": []}
+    for category in categories:
+        response["statistics"].append(category[0])
+
     return response
 
 
@@ -181,39 +212,10 @@ def product_statistics():
 @application.route("/category_statistics", methods=["GET"])
 @jwt_required()
 def category_statistics():
-    jwtToken = get_jwt()
-    if jwtToken["roleId"] != OWNER_ROLE_ID_STRING:
-        return jsonify(msg="Missing Authorization Header"), 401
-
-    categories = dict()
-    allCategories = Category.query.all()
-    for category in allCategories:
-        if category.categoryName not in categories:
-            categories[category.categoryName] = 0
-        quantity = database.session.query(
-            func.sum(ProductOrder.quantity)
-        ).join(
-            ProductCategory, ProductOrder.productId == ProductCategory.productId
-        ).join(
-            Order, ProductOrder.orderId == Order.id
-        ).filter(
-            and_(
-                ProductCategory.categoryId == category.id,
-                Order.orderStatus == "COMPLETE"
-            )
-        ).group_by(
-            ProductCategory.categoryId
-        ).scalar()
-        if quantity:
-            categories[category.categoryName] += quantity
-    sortedCategories = dict(sorted(categories.items(), key=lambda item: (-item[1], item[0])))
-    response = {
-        "statistics": []
-    }
-    for categoryName in sortedCategories:
-        response["statistics"].append(categoryName)
-
-    return jsonify(response), 200
+    errorMessage, errorCode = validateCategoryStatisticsRequest()
+    if len(errorMessage) > 0:
+        return jsonify(msg=errorMessage), errorCode
+    return jsonify(getCategoryStatistics()), 200
 
 
 if __name__ == "__main__":
