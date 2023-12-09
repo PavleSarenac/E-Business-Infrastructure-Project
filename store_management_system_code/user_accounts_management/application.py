@@ -14,32 +14,36 @@ application.config.from_object(Configuration)
 jwt = JWTManager(application)
 
 
-def registration(userRole):
-    forename = request.json.get("forename", "")
-    surname = request.json.get("surname", "")
-    email = request.json.get("email", "")
-    password = request.json.get("password", "")
+def validateRegistrationInput(postRequestBody):
+    forename = postRequestBody.json.get("forename", "")
+    surname = postRequestBody.json.get("surname", "")
+    email = postRequestBody.json.get("email", "")
+    password = postRequestBody.json.get("password", "")
 
     if len(forename) == 0:
-        return jsonify(message="Field forename is missing."), 400
+        return "Field forename is missing.", 400, forename, surname, email, password
     if len(surname) == 0:
-        return jsonify(message="Field surname is missing."), 400
+        return "Field surname is missing.", 400, forename, surname, email, password
     if len(email) == 0:
-        return jsonify(message="Field email is missing."), 400
+        return "Field email is missing.", 400, forename, surname, email, password
     if len(password) == 0:
-        return jsonify(message="Field password is missing."), 400
+        return "Field password is missing.", 400, forename, surname, email, password
 
     email_pattern = r'^[\w\.-]+@[\w\.-]+\.(com|org|net|edu|gov|mil|io|co\.uk)$'
     if not re.match(email_pattern, email):
-        return jsonify(message="Invalid email."), 400
+        return "Invalid email.", 400, forename, surname, email, password
 
     if len(password) < 8:
-        return jsonify(message="Invalid password."), 400
+        return "Invalid password.", 400, forename, surname, email, password
 
     userAlreadyRegistered = User.query.filter(User.email == email).first()
     if userAlreadyRegistered:
-        return jsonify(message="Email already exists."), 400
+        return "Email already exists.", 400, forename, surname, email, password
 
+    return "", 0, forename, surname, email, password
+
+
+def registerNewUser(userRole, forename, surname, email, password):
     userRoleId = CUSTOMER_ROLE_ID if userRole == "customer" else COURIER_ROLE_ID
     user = User(
         email=email,
@@ -51,6 +55,12 @@ def registration(userRole):
     database.session.add(user)
     database.session.commit()
 
+
+def registration(userRole):
+    errorMessage, errorCode, forename, surname, email, password = validateRegistrationInput(request)
+    if len(errorMessage) > 0:
+        return jsonify(message=errorMessage), errorCode
+    registerNewUser(userRole, forename, surname, email, password)
     return Response(status=200)
 
 
