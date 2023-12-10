@@ -206,6 +206,7 @@ def product_statistics():
     errorMessage, errorCode = validateProductStatisticsRequest()
     if len(errorMessage) > 0:
         return jsonify(msg=errorMessage), errorCode
+
     return jsonify(getProductStatistics()), 200
 
 
@@ -215,6 +216,7 @@ def category_statistics():
     errorMessage, errorCode = validateCategoryStatisticsRequest()
     if len(errorMessage) > 0:
         return jsonify(msg=errorMessage), errorCode
+
     return jsonify(getCategoryStatistics()), 200
 
 

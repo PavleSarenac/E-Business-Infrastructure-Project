@@ -3,7 +3,7 @@ from configuration import Configuration
 from models import database, Product, Category, Order, ProductOrder, ProductCategory
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt, get_jwt_identity
 from datetime import datetime, timezone
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, asc
 
 application = Flask(__name__)
 application.config.from_object(Configuration)
@@ -82,12 +82,62 @@ def validateOrderRequest():
     return requests, "", 0
 
 
+def getNewOrderData(requests):
+    requests = sorted(requests, key=lambda x: x["id"])
+    orderedProductIds = [currentRequest["id"] for currentRequest in requests]
+    orderedProductPrices = database.session.query(
+        Product.productPrice.label("ProductPrice")
+    ).filter(
+        Product.id.in_(orderedProductIds)
+    ).order_by(
+        asc(Product.id)
+    ).all()
+
+    totalOrderPrice = 0
+    for currentRequest, orderedProductPrice in zip(requests, orderedProductPrices):
+        totalOrderPrice += currentRequest["quantity"] * orderedProductPrice[0]
+    orderCreationTime = datetime.now(timezone.utc).isoformat()
+
+    return totalOrderPrice, "CREATED", orderCreationTime, get_jwt_identity()
+
+
+def insertOrder(requests):
+    totalOrderPrice, orderStatus, orderCreationTime, buyerEmail = getNewOrderData(requests)
+
+    newOrder = Order(
+        totalOrderPrice=totalOrderPrice,
+        orderStatus=orderStatus,
+        orderCreationTime=orderCreationTime,
+        buyerEmail=buyerEmail
+    )
+    database.session.add(newOrder)
+    database.session.commit()
+
+    return newOrder
+
+
+def insertProductOrder(requests, newOrder):
+    newProductOrders = []
+    for currentRequest in requests:
+        newProductOrders.append(
+            ProductOrder(
+                productId=currentRequest["id"],
+                orderId=newOrder.id,
+                quantity=currentRequest["quantity"]
+            )
+        )
+    database.session.bulk_save_objects(newProductOrders)
+    database.session.commit()
+    return {"id": newOrder.id}
+
+
 @application.route("/search", methods=["GET"])
 @jwt_required()
 def search():
     errorMessage, errorCode = validateSearchRequest()
     if len(errorMessage) > 0:
         return jsonify(msg=errorMessage), errorCode
+
     return jsonify(getSearchResult()), 200
 
 
@@ -100,30 +150,10 @@ def order():
     if len(errorMessage) > 0:
         return jsonify(message=errorMessage), errorCode
 
-    totalOrderPrice = 0
-    for currentRequest in requests:
-        currentProduct = Product.query.filter(Product.id == currentRequest["id"]).first()
-        totalOrderPrice += currentRequest["quantity"] * currentProduct.productPrice
-    orderCreationTime = datetime.now(timezone.utc).isoformat()
-    newOrder = Order(
-        totalOrderPrice=totalOrderPrice,
-        orderStatus="CREATED",
-        orderCreationTime=orderCreationTime,
-        buyerEmail=get_jwt_identity()
-    )
-    database.session.add(newOrder)
-    database.session.commit()
+    newOrder = insertOrder(requests)
+    response = insertProductOrder(requests, newOrder)
 
-    for currentRequest in requests:
-        newProductOrder = ProductOrder(
-            productId=currentRequest["id"],
-            orderId=newOrder.id,
-            quantity=currentRequest["quantity"]
-        )
-        database.session.add(newProductOrder)
-        database.session.commit()
-
-    return jsonify({"id": newOrder.id}), 200
+    return jsonify(response), 200
 
 
 @application.route("/status", methods=["GET"])
