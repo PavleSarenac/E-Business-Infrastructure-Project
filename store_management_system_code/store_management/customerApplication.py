@@ -37,20 +37,20 @@ def getSearchResult():
     ).all()
 
     for searchResult in searchResults:
-        if searchResult[3] not in resultDictionary["categories"]:
-            resultDictionary["categories"].append(searchResult[3])
+        if searchResult.CategoryName not in resultDictionary["categories"]:
+            resultDictionary["categories"].append(searchResult.CategoryName)
         productAlreadyAdded = False
         for product in resultDictionary["products"]:
-            if product["id"] == searchResult[0]:
+            if product["id"] == searchResult.ProductId:
                 productAlreadyAdded = True
-                product["categories"].append(searchResult[3])
+                product["categories"].append(searchResult.CategoryName)
                 break
         if not productAlreadyAdded:
             resultDictionary["products"].append({
-                "categories": [searchResult[3]],
-                "id": searchResult[0],
-                "name": searchResult[1],
-                "price": searchResult[2]
+                "categories": [searchResult.CategoryName],
+                "id": searchResult.ProductId,
+                "name": searchResult.ProductName,
+                "price": searchResult.ProductPrice
             })
     return resultDictionary
 
@@ -95,7 +95,7 @@ def getNewOrderData(requests):
 
     totalOrderPrice = 0
     for currentRequest, orderedProductPrice in zip(requests, orderedProductPrices):
-        totalOrderPrice += currentRequest["quantity"] * orderedProductPrice[0]
+        totalOrderPrice += currentRequest["quantity"] * orderedProductPrice.ProductPrice
     orderCreationTime = datetime.now(timezone.utc).isoformat()
 
     return totalOrderPrice, "CREATED", orderCreationTime, get_jwt_identity()
@@ -103,7 +103,6 @@ def getNewOrderData(requests):
 
 def insertOrder(requests):
     totalOrderPrice, orderStatus, orderCreationTime, buyerEmail = getNewOrderData(requests)
-
     newOrder = Order(
         totalOrderPrice=totalOrderPrice,
         orderStatus=orderStatus,
@@ -112,7 +111,6 @@ def insertOrder(requests):
     )
     database.session.add(newOrder)
     database.session.commit()
-
     return newOrder
 
 
@@ -129,6 +127,76 @@ def insertProductOrder(requests, newOrder):
     database.session.bulk_save_objects(newProductOrders)
     database.session.commit()
     return {"id": newOrder.id}
+
+
+def validateStatusRequest():
+    jwtToken = get_jwt()
+    if jwtToken["roleId"] != "1":
+        return "Missing Authorization Header", 401
+    return "", 0
+
+
+def getOrderStatuses():
+    orders = database.session.query(
+        Order.id.label("OrderId"),
+        Order.totalOrderPrice.label("TotalOrderPrice"),
+        Order.orderStatus.label("OrderStatus"),
+        Order.orderCreationTime.label("OrderCreationTime"),
+        Product.id.label("ProductId"),
+        Product.productName.label("ProductName"),
+        Product.productPrice.label("ProductPrice"),
+        ProductOrder.quantity.label("Quantity"),
+        Category.categoryName.label("CategoryName")
+    ).join(
+        ProductOrder, Order.id == ProductOrder.orderId
+    ).join(
+        Product, ProductOrder.productId == Product.id
+    ).join(
+        ProductCategory, Product.id == ProductCategory.productId
+    ).join(
+        Category, ProductCategory.categoryId == Category.id
+    ).order_by(
+        asc("OrderId"), asc("ProductId"), asc("CategoryName")
+    ).all()
+
+    response = {"orders": []}
+    previousOrderId = previousProductId = -1
+    currentOrderIndex = currentProductIndex = -1
+    for currentOrder in orders:
+        currentOrderId = currentOrder.OrderId
+        currentProductId = currentOrder.ProductId
+        if currentOrderId != previousOrderId:
+            currentOrderIndex += 1
+            currentProductIndex = 0
+            response["orders"].append({
+                "products": [
+                    {
+                        "categories": [currentOrder.CategoryName],
+                        "name": currentOrder.ProductName,
+                        "price": currentOrder.ProductPrice,
+                        "quantity": currentOrder.Quantity
+                    }
+                ],
+                "price": currentOrder.TotalOrderPrice,
+                "status": currentOrder.OrderStatus,
+                "timestamp": currentOrder.OrderCreationTime
+            })
+        else:
+            if currentProductId != previousProductId:
+                response["orders"][currentOrderIndex]["products"].append({
+                    "categories": [currentOrder.CategoryName],
+                    "name": currentOrder.ProductName,
+                    "price": currentOrder.ProductPrice,
+                    "quantity": currentOrder.Quantity
+                })
+                currentProductIndex += 1
+            else:
+                response["orders"][currentOrderIndex]["products"][currentProductIndex]["categories"].append(
+                    currentOrder.CategoryName
+                )
+        previousOrderId = currentOrderId
+        previousProductId = currentProductId
+    return response
 
 
 @application.route("/search", methods=["GET"])
@@ -159,31 +227,11 @@ def order():
 @application.route("/status", methods=["GET"])
 @jwt_required()
 def status():
-    jwtToken = get_jwt()
-    if jwtToken["roleId"] != "1":
-        return jsonify(msg="Missing Authorization Header"), 401
+    errorMessage, errorCode = validateStatusRequest()
+    if len(errorMessage) > 0:
+        return jsonify(msg=errorMessage), errorCode
 
-    response = {
-        "orders": []
-    }
-    allOrders = Order.query.all()
-    for currentOrder in allOrders:
-        newOrder = dict()
-        newOrder["products"] = []
-        for product in currentOrder.products:
-            newProduct = dict()
-            newProduct["categories"] = [category.categoryName for category in product.categories]
-            newProduct["name"] = product.productName
-            newProduct["price"] = product.productPrice
-            newProduct["quantity"] = ProductOrder.query.filter(
-                and_(ProductOrder.productId == product.id, ProductOrder.orderId == currentOrder.id)
-            ).first().quantity
-            newOrder["products"].append(newProduct)
-        newOrder["price"] = currentOrder.totalOrderPrice
-        newOrder["status"] = currentOrder.orderStatus
-        newOrder["timestamp"] = currentOrder.orderCreationTime
-        response["orders"].append(newOrder)
-    return jsonify(response), 200
+    return jsonify(getOrderStatuses()), 200
 
 
 @application.route("/delivered", methods=["POST"])
