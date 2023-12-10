@@ -199,6 +199,30 @@ def getOrderStatuses():
     return response
 
 
+def validateDeliveredRequest():
+    jwtToken = get_jwt()
+    if jwtToken["roleId"] != "1":
+        return "Missing Authorization Header", 401, None
+
+    orderId = request.json.get("id", None)
+    if orderId is None:
+        return "Missing order id.", 400, None
+    if type(orderId) is not int or orderId <= 0:
+        return "Invalid order id.", 400, None
+    orderForDeliveryConfirmation = Order.query.filter(Order.id == orderId).first()
+    if not orderForDeliveryConfirmation:
+        return "Invalid order id.", 400, None
+    if orderForDeliveryConfirmation.orderStatus != "PENDING":
+        return "Invalid order id.", 400, None
+
+    return "", 0, orderForDeliveryConfirmation
+
+
+def confirmOrderDelivery(orderForDeliveryConfirmation):
+    orderForDeliveryConfirmation.orderStatus = "COMPLETE"
+    database.session.commit()
+
+
 @application.route("/search", methods=["GET"])
 @jwt_required()
 def search():
@@ -237,23 +261,13 @@ def status():
 @application.route("/delivered", methods=["POST"])
 @jwt_required()
 def delivered():
-    jwtToken = get_jwt()
-    if jwtToken["roleId"] != "1":
-        return jsonify(msg="Missing Authorization Header"), 401
+    errorMessage, errorCode, orderForDeliveryConfirmation = validateDeliveredRequest()
+    if errorCode == 401:
+        return jsonify(msg=errorMessage), errorCode
+    if len(errorMessage) > 0:
+        return jsonify(message=errorMessage), errorCode
 
-    orderId = request.json.get("id", "null")
-    if orderId == "null":
-        return jsonify(message="Missing order id."), 400
-    if type(orderId) is not int or orderId <= 0:
-        return jsonify(message="Invalid order id."), 400
-    if not Order.query.filter(Order.id == orderId).first():
-        return jsonify(message="Invalid order id."), 400
-    orderStatus = Order.query.filter(Order.id == orderId).first().orderStatus
-    if orderStatus != "PENDING":
-        return jsonify(message="Invalid order id."), 400
-    _order = Order.query.filter(Order.id == orderId).first()
-    _order.orderStatus = "COMPLETE"
-    database.session.commit()
+    confirmOrderDelivery(orderForDeliveryConfirmation)
 
     return Response(status=200)
 
