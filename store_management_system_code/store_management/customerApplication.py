@@ -1,9 +1,9 @@
 from flask import Flask, request, jsonify, Response
 from configuration import Configuration
-from models import database, Product, Category, Order, ProductOrder
+from models import database, Product, Category, Order, ProductOrder, ProductCategory
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt, get_jwt_identity
 from datetime import datetime, timezone
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 
 application = Flask(__name__)
 application.config.from_object(Configuration)
@@ -19,34 +19,67 @@ def validateSearchRequest():
 
 
 def getSearchResult():
-    resultDictionary = {
-        "categories": [],
-        "products": []
-    }
-    if "name" in request.args:
-        searchedProducts = Product.query.filter(Product.productName.like(f"%{request.args['name']}%")).all()
-    else:
-        searchedProducts = Product.query.all()
-    if "category" in request.args:
-        searchedCategories = Category.query.filter(Category.categoryName.like(f"%{request.args['category']}%")).all()
-    else:
-        searchedCategories = Category.query.all()
-    for product in searchedProducts:
-        categoryFound = False
-        for category in product.categories:
-            for searchedCategory in searchedCategories:
-                if category.categoryName == searchedCategory.categoryName:
-                    if category.categoryName not in resultDictionary["categories"]:
-                        resultDictionary["categories"].append(category.categoryName)
-                    categoryFound = True
-        if categoryFound:
+    resultDictionary = {"categories": [], "products": []}
+    searchResults = database.session.query(
+        Product.id.label("ProductId"),
+        Product.productName.label("ProductName"),
+        Product.productPrice.label("ProductPrice"),
+        Category.categoryName.label("CategoryName")
+    ).join(
+        ProductCategory, Product.id == ProductCategory.productId
+    ).join(
+        Category, ProductCategory.categoryId == Category.id
+    ).filter(
+        and_(
+            Product.productName.like(f"%{request.args.get('name', '')}%"),
+            Category.categoryName.like(f"%{request.args.get('category', '')}%")
+        )
+    ).all()
+
+    for searchResult in searchResults:
+        if searchResult[3] not in resultDictionary["categories"]:
+            resultDictionary["categories"].append(searchResult[3])
+        productAlreadyAdded = False
+        for product in resultDictionary["products"]:
+            if product["id"] == searchResult[0]:
+                productAlreadyAdded = True
+                product["categories"].append(searchResult[3])
+                break
+        if not productAlreadyAdded:
             resultDictionary["products"].append({
-                "categories": [currentCategory.categoryName for currentCategory in product.categories],
-                "id": product.id,
-                "name": product.productName,
-                "price": product.productPrice
+                "categories": [searchResult[3]],
+                "id": searchResult[0],
+                "name": searchResult[1],
+                "price": searchResult[2]
             })
     return resultDictionary
+
+
+def validateOrderRequest():
+    jwtToken = get_jwt()
+    if jwtToken["roleId"] != "1":
+        return None, "Missing Authorization Header", 401
+
+    requests = request.json.get("requests", "null")
+    if requests == "null":
+        return None, "Field requests is missing.", 400
+
+    requestNumber = 0
+    allProductIds = [product.id for product in Product.query.all()]
+    for currentRequest in requests:
+        if "id" not in currentRequest:
+            return None, f"Product id is missing for request number {requestNumber}.", 400
+        if "quantity" not in currentRequest:
+            return None, f"Product quantity is missing for request number {requestNumber}.", 400
+        if type(currentRequest["id"]) is not int or currentRequest["id"] <= 0:
+            return None, f"Invalid product id for request number {requestNumber}.", 400
+        if type(currentRequest["quantity"]) is not int or currentRequest["quantity"] <= 0:
+            return None, f"Invalid product quantity for request number {requestNumber}.", 400
+        if currentRequest["id"] not in allProductIds:
+            return None, f"Invalid product for request number {requestNumber}.", 400
+        requestNumber += 1
+
+    return requests, "", 0
 
 
 @application.route("/search", methods=["GET"])
@@ -61,26 +94,11 @@ def search():
 @application.route("/order", methods=["POST"])
 @jwt_required()
 def order():
-    jwtToken = get_jwt()
-    if jwtToken["roleId"] != "1":
-        return jsonify(msg="Missing Authorization Header"), 401
-
-    requests = request.json.get("requests", "null")
-    if requests == "null":
-        return jsonify(message="Field requests is missing."), 400
-    requestNumber = 0
-    for currentRequest in requests:
-        if "id" not in currentRequest:
-            return jsonify(message="Product id is missing for request number " + str(requestNumber) + "."), 400
-        if "quantity" not in currentRequest:
-            return jsonify(message="Product quantity is missing for request number " + str(requestNumber) + "."), 400
-        if type(currentRequest["id"]) is not int or currentRequest["id"] <= 0:
-            return jsonify(message="Invalid product id for request number " + str(requestNumber) + "."), 400
-        if type(currentRequest["quantity"]) is not int or currentRequest["quantity"] <= 0:
-            return jsonify(message="Invalid product quantity for request number " + str(requestNumber) + "."), 400
-        if not Product.query.filter(Product.id == currentRequest["id"]).first():
-            return jsonify(message="Invalid product for request number " + str(requestNumber) + "."), 400
-        requestNumber += 1
+    requests, errorMessage, errorCode = validateOrderRequest()
+    if errorCode == 401:
+        return jsonify(msg=errorMessage), errorCode
+    if len(errorMessage) > 0:
+        return jsonify(message=errorMessage), errorCode
 
     totalOrderPrice = 0
     for currentRequest in requests:
