@@ -128,9 +128,9 @@ def validateProductStatisticsRequest():
 
 def getProductStatistics():
     productStatistics = database.session.query(
-        Product.productName,
-        func.sum(case([(Order.orderStatus == "COMPLETE", ProductOrder.quantity)], else_=0)).label("sold"),
-        func.sum(case([(Order.orderStatus != "COMPLETE", ProductOrder.quantity)], else_=0)).label("waiting")
+        Product.productName.label("ProductName"),
+        func.sum(case([(Order.orderStatus == "COMPLETE", ProductOrder.quantity)], else_=0)).label("Sold"),
+        func.sum(case([(Order.orderStatus != "COMPLETE", ProductOrder.quantity)], else_=0)).label("Waiting")
     ).join(
         ProductOrder, Product.id == ProductOrder.productId
     ).join(
@@ -142,9 +142,9 @@ def getProductStatistics():
     response = {"statistics": []}
     for productStats in productStatistics:
         response["statistics"].append({
-            "name": productStats[0],
-            "sold": int(productStats[1]),
-            "waiting": int(productStats[2])
+            "name": productStats.ProductName,
+            "sold": int(productStats.Sold),
+            "waiting": int(productStats.Waiting)
         })
 
     return response
@@ -175,7 +175,7 @@ def getCategoryStatistics():
 
     response = {"statistics": []}
     for category in categories:
-        response["statistics"].append(category[0])
+        response["statistics"].append(category.CategoryName)
 
     return response
 
