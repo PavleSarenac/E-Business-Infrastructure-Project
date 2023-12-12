@@ -22,13 +22,8 @@ with application.app_context() as context:
     upgrade()
 
     customerRole = Role(roleDescription="customer")
-    storeOwnerRole = Role(roleDescription="storeOwner")
+    storeOwnerRole = Role(roleDescription="owner")
     courierRole = Role(roleDescription="courier")
-
-    database.session.add(customerRole)
-    database.session.add(storeOwnerRole)
-    database.session.add(courierRole)
-    database.session.commit()
 
     storeOwner = User(
         email="onlymoney@gmail.com",
@@ -38,5 +33,5 @@ with application.app_context() as context:
         roleId=OWNER_ROLE_ID
     )
 
-    database.session.add(storeOwner)
+    database.session.bulk_save_objects([customerRole, storeOwnerRole, courierRole, storeOwner])
     database.session.commit()
