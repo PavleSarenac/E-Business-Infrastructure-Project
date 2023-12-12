@@ -12,6 +12,8 @@ services:
       timeout: 10s
       retries: 40
       start_period: 25s
+    networks:
+      - authenticationNetwork
   storeDatabase:
     image: mysql
     ports:
@@ -23,10 +25,15 @@ services:
       timeout: 10s
       retries: 40
       start_period: 25s
+    networks:
+      - storeNetwork
   adminer:
     image: adminer
     ports:
       - "8080:8080"
+    networks:
+      - authenticationNetwork
+      - storeNetwork
   authenticationDatabaseMigration:
     image: authenticationdatabasemigration
     environment:
@@ -37,6 +44,8 @@ services:
     depends_on:
       authenticationDatabase:
         condition: service_healthy
+    networks:
+      - authenticationNetwork
   storeDatabaseMigration:
     image: storedatabasemigration
     environment:
@@ -47,6 +56,8 @@ services:
     depends_on:
       storeDatabase:
         condition: service_healthy
+    networks:
+      - storeNetwork
   authentication:
     image: authentication
     ports:
@@ -58,6 +69,8 @@ services:
       - DATABASE_PASSWORD=root
     depends_on:
       - authenticationDatabaseMigration
+    networks:
+      - authenticationNetwork
   owner:
     image: owner
     ports:
@@ -69,6 +82,8 @@ services:
       - DATABASE_PASSWORD=root
     depends_on:
       - storeDatabaseMigration
+    networks:
+      - storeNetwork
   customer:
     image: customer
     ports:
@@ -80,6 +95,8 @@ services:
       - DATABASE_PASSWORD=root
     depends_on:
       - storeDatabaseMigration
+    networks:
+      - storeNetwork
   courier:
     image: courier
     ports:
@@ -91,3 +108,9 @@ services:
       - DATABASE_PASSWORD=root
     depends_on:
       - storeDatabaseMigration
+    networks:
+      - storeNetwork
+
+networks:
+  authenticationNetwork:
+  storeNetwork:
