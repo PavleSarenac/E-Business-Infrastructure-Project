@@ -68,7 +68,8 @@ services:
       - DATABASE_USERNAME=root
       - DATABASE_PASSWORD=root
     depends_on:
-      - authenticationDatabaseMigration
+      authenticationDatabaseMigration:
+        condition: service_completed_successfully
     networks:
       - authenticationNetwork
   owner:
@@ -81,7 +82,8 @@ services:
       - DATABASE_USERNAME=root
       - DATABASE_PASSWORD=root
     depends_on:
-      - storeDatabaseMigration
+      storeDatabaseMigration:
+        condition: service_completed_successfully
     networks:
       - storeNetwork
   customer:
@@ -94,7 +96,8 @@ services:
       - DATABASE_USERNAME=root
       - DATABASE_PASSWORD=root
     depends_on:
-      - storeDatabaseMigration
+      storeDatabaseMigration:
+        condition: service_completed_successfully
     networks:
       - storeNetwork
   courier:
@@ -107,7 +110,8 @@ services:
       - DATABASE_USERNAME=root
       - DATABASE_PASSWORD=root
     depends_on:
-      - storeDatabaseMigration
+      storeDatabaseMigration:
+        condition: service_completed_successfully
     networks:
       - storeNetwork
 
