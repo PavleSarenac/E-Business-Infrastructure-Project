@@ -3,8 +3,6 @@ version: "3.8"
 services:
   authenticationDatabase:
     image: mysql
-    ports:
-      - "3306:3306"
     environment:
       - MYSQL_ROOT_PASSWORD=root
     healthcheck:
@@ -18,8 +16,6 @@ services:
       - "authenticationDatabaseData:/var/lib/mysql"
   storeDatabase:
     image: mysql
-    ports:
-      - "3307:3306"
     environment:
       - MYSQL_ROOT_PASSWORD=root
     healthcheck:
