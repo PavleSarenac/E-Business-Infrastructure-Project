@@ -134,7 +134,7 @@ def getProductStatistics():
     ).join(
         ProductOrder, Product.id == ProductOrder.productId
     ).join(
-        Order, Order.id == ProductOrder.orderId
+        Order, ProductOrder.orderId == Order.id
     ).group_by(
         Product.productName
     ).all()
