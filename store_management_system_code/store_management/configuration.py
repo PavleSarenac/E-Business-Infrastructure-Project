@@ -7,6 +7,7 @@ class Configuration:
     OWNER_APPLICATION_PORT = 5001
     CUSTOMER_APPLICATION_PORT = 5002
     COURIER_APPLICATION_PORT = 5003
+    SPARK_APPLICATION_PORT = 5004
 
     DATABASE_URL = os.environ["DATABASE_URL"] if "DATABASE_URL" in os.environ else "localhost"
     DATABASE_USERNAME = os.environ["DATABASE_USERNAME"] if "DATABASE_USERNAME" in os.environ else "root"

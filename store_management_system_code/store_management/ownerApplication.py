@@ -1,8 +1,9 @@
 from flask import Flask, request, jsonify, Response
 from configuration import Configuration
-from models import database, Product, Category, ProductCategory, Order, ProductOrder
-from sqlalchemy import func, case, desc, asc
+from models import database, Product, Category, ProductCategory
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt
+from requests import request as httpRequest
+import json
 
 OWNER_ROLE_ID_STRING = "2"
 
@@ -126,58 +127,11 @@ def validateProductStatisticsRequest():
     return "", 0
 
 
-def getProductStatistics():
-    productStatistics = database.session.query(
-        Product.productName.label("ProductName"),
-        func.sum(case([(Order.orderStatus == "COMPLETE", ProductOrder.quantity)], else_=0)).label("Sold"),
-        func.sum(case([(Order.orderStatus != "COMPLETE", ProductOrder.quantity)], else_=0)).label("Waiting")
-    ).join(
-        ProductOrder, Product.id == ProductOrder.productId
-    ).join(
-        Order, ProductOrder.orderId == Order.id
-    ).group_by(
-        Product.productName
-    ).all()
-
-    response = {"statistics": []}
-    for productStats in productStatistics:
-        response["statistics"].append({
-            "name": productStats.ProductName,
-            "sold": int(productStats.Sold),
-            "waiting": int(productStats.Waiting)
-        })
-
-    return response
-
-
 def validateCategoryStatisticsRequest():
     jwtToken = get_jwt()
     if jwtToken["roleId"] != OWNER_ROLE_ID_STRING:
         return "Missing Authorization Header", 401
     return "", 0
-
-
-def getCategoryStatistics():
-    categories = database.session.query(
-        Category.categoryName.label("CategoryName"),
-        func.sum(case([(Order.orderStatus == "COMPLETE", ProductOrder.quantity)], else_=0)).label("Quantity")
-    ).outerjoin(
-        ProductCategory, Category.id == ProductCategory.categoryId
-    ).outerjoin(
-        ProductOrder, ProductCategory.productId == ProductOrder.productId
-    ).outerjoin(
-        Order, ProductOrder.orderId == Order.id
-    ).group_by(
-        "CategoryName"
-    ).order_by(
-        desc("Quantity"), asc("CategoryName")
-    ).all()
-
-    response = {"statistics": []}
-    for category in categories:
-        response["statistics"].append(category.CategoryName)
-
-    return response
 
 
 @application.route("/update", methods=["POST"])
@@ -207,7 +161,12 @@ def product_statistics():
     if len(errorMessage) > 0:
         return jsonify(msg=errorMessage), errorCode
 
-    return jsonify(getProductStatistics()), 200
+    response = httpRequest(
+        method="get",
+        url="http://sparkApplication:5004/product_statistics"
+    )
+    print(response.text)
+    return jsonify(json.loads(response.text)), 200
 
 
 @application.route("/category_statistics", methods=["GET"])
@@ -217,7 +176,12 @@ def category_statistics():
     if len(errorMessage) > 0:
         return jsonify(msg=errorMessage), errorCode
 
-    return jsonify(getCategoryStatistics()), 200
+    response = httpRequest(
+        method="get",
+        url="http://sparkApplication:5004/category_statistics"
+    )
+    print(response.text)
+    return jsonify(json.loads(response.text)), 200
 
 
 if __name__ == "__main__":

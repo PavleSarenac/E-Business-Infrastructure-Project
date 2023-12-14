@@ -6,10 +6,10 @@ services:
     environment:
       - MYSQL_ROOT_PASSWORD=root
     healthcheck:
-      test: [ "CMD-SHELL", "mysqladmin ping -h localhost -u root -proot" ]
-      timeout: 10s
-      retries: 40
-      start_period: 25s
+      test: [ "CMD-SHELL", "for i in {1..5}; do mysqladmin ping -h localhost -u root -proot && sleep 5 || exit 1; done" ]
+      timeout: 40s
+      retries: 30
+      start_period: 45s
     networks:
       - authenticationNetwork
     volumes:
@@ -19,10 +19,10 @@ services:
     environment:
       - MYSQL_ROOT_PASSWORD=root
     healthcheck:
-      test: [ "CMD-SHELL", "mysqladmin ping -h localhost -u root -proot" ]
-      timeout: 10s
-      retries: 40
-      start_period: 25s
+      test: [ "CMD-SHELL", "for i in {1..5}; do mysqladmin ping -h localhost -u root -proot && sleep 5 || exit 1; done" ]
+      timeout: 40s
+      retries: 30
+      start_period: 45s
     networks:
       - storeNetwork
     volumes:
@@ -148,6 +148,8 @@ services:
       - storeNetwork
   sparkApplication:
     image: sparkapplication
+    ports:
+      - "5004:5004"
     depends_on:
       spark-master:
         condition: service_started
