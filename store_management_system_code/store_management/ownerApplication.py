@@ -165,7 +165,6 @@ def product_statistics():
         method="get",
         url="http://sparkApplication:5004/product_statistics"
     )
-    print(response.text)
     return jsonify(json.loads(response.text)), 200
 
 
@@ -180,7 +179,6 @@ def category_statistics():
         method="get",
         url="http://sparkApplication:5004/category_statistics"
     )
-    print(response.text)
     return jsonify(json.loads(response.text)), 200
 
 

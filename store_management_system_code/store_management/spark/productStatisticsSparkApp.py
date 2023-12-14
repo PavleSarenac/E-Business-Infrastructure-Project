@@ -68,6 +68,7 @@ for row in productStatistics:
         "waiting": int(row["Waiting"])
     })
 
-print(json.dumps(productStatisticsResponse), end="", flush=True)
+with open("/app/store_management/spark/productStatisticsTempFile.txt", "w") as productStatisticsFile:
+    productStatisticsFile.write(json.dumps(productStatisticsResponse))
 
 spark.stop()

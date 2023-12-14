@@ -74,6 +74,7 @@ categoryStatisticsResponse = {"statistics": []}
 for row in categoryStatistics:
     categoryStatisticsResponse["statistics"].append(row["CategoryName"])
 
-print(json.dumps(categoryStatisticsResponse), end="", flush=True)
+with open("/app/store_management/spark/categoryStatisticsTempFile.txt", "w") as categoryStatisticsFile:
+    categoryStatisticsFile.write(json.dumps(categoryStatisticsResponse))
 
 spark.stop()

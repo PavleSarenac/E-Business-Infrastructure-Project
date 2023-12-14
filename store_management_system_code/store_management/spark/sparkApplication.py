@@ -11,9 +11,10 @@ def product_statistics():
     os.environ["SPARK_SUBMIT_ARGS"] = \
         "--driver-class-path /app/store_management/spark/mysql-connector-j-8.0.33.jar" \
         " --jars /app/store_management/spark/mysql-connector-j-8.0.33.jar"
-    productStatistics = subprocess.check_output(["/template.sh"])
-    print(productStatistics.decode())
-    return productStatistics.decode()
+    subprocess.check_output(["/template.sh"])
+    with open("/app/store_management/spark/productStatisticsTempFile.txt", "r") as productStatisticsFile:
+        productStatistics = productStatisticsFile.read()
+    return productStatistics
 
 
 @application.route("/category_statistics", methods=["GET"])
@@ -22,9 +23,10 @@ def category_statistics():
     os.environ["SPARK_SUBMIT_ARGS"] = \
         "--driver-class-path /app/store_management/spark/mysql-connector-j-8.0.33.jar" \
         " --jars /app/store_management/spark/mysql-connector-j-8.0.33.jar"
-    categoryStatistics = subprocess.check_output(["/template.sh"])
-    print(categoryStatistics.decode())
-    return categoryStatistics.decode()
+    subprocess.check_output(["/template.sh"])
+    with open("/app/store_management/spark/categoryStatisticsTempFile.txt", "r") as categoryStatisticsFile:
+        categoryStatistics = categoryStatisticsFile.read()
+    return categoryStatistics
 
 
 if __name__ == "__main__":
