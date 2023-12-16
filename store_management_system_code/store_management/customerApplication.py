@@ -155,6 +155,8 @@ def getOrderStatuses():
         ProductCategory, Product.id == ProductCategory.productId
     ).join(
         Category, ProductCategory.categoryId == Category.id
+    ).filter(
+        Order.buyerEmail == get_jwt_identity()
     ).order_by(
         asc("OrderId"), asc("ProductId"), asc("CategoryName")
     ).all()
