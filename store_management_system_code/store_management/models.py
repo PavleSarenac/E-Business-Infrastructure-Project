@@ -45,5 +45,6 @@ class Order(database.Model):
     orderStatus = database.Column(database.String(256), nullable=False)
     orderCreationTime = database.Column(DateTime, nullable=False)
     buyerEmail = database.Column(database.String(256), nullable=False)
+    ethereumContractAddress = database.Column(database.String(256), nullable=False)
 
     products = database.relationship("Product", secondary=ProductOrder.__table__, back_populates="orders")

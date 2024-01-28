@@ -1,5 +1,18 @@
 import os
 from datetime import timedelta
+from web3 import Web3, HTTPProvider
+
+
+def readFile(filePath):
+    with open(filePath, "r") as file:
+        return file.read()
+
+
+web3 = Web3(HTTPProvider("http://ganache:8545"))
+bytecode = readFile("./blockchain/output/Order.bin")
+abi = readFile("./blockchain/output/Order.abi")
+ethereumContract = web3.eth.contract(bytecode=bytecode, abi=abi)
+ownerEthereumAccount = web3.eth.accounts[0]  # receno u tekstu da prvi racun treba dodeliti vlasniku prodavnice
 
 
 class Configuration:

@@ -169,6 +169,12 @@ services:
       - ENABLE_INIT_DAEMON=False
     networks:
       - storeNetwork
+  ganache:
+    image: trufflesuite/ganache-cli
+    ports:
+      - "8545:8545"
+    networks:
+      - storeNetwork
 
 networks:
   authenticationNetwork:
