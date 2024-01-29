@@ -1,5 +1,6 @@
 from flask_jwt_extended import jwt_required, get_jwt
 from functools import wraps
+from flask import jsonify
 
 
 def roleCheck(roleId):
@@ -11,7 +12,7 @@ def roleCheck(roleId):
             if jwtToken["roleId"] == roleId:
                 return function(*args, **kwargs)
             else:
-                return "Missing Authorization Header", 401
+                return jsonify(msg="Missing Authorization Header"), 401
 
         return wrapper
 

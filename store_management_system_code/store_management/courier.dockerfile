@@ -12,6 +12,7 @@ COPY ./models.py ./models.py
 COPY ./requirements.txt ./requirements.txt
 COPY ./blockchain/output/Order.abi ./blockchain/output/Order.abi
 COPY ./blockchain/output/Order.bin ./blockchain/output/Order.bin
+COPY ./decorators.py ./decorators.py
 
 RUN pip install -r ./requirements.txt
 

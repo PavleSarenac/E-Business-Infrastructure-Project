@@ -8,6 +8,9 @@ from web3 import Account
 from web3.exceptions import ContractLogicError
 from math import ceil
 import json
+from decorators import roleCheck
+
+CUSTOMER_ROLE_ID_STRING = "1"
 
 application = Flask(__name__)
 application.config.from_object(Configuration)
@@ -15,11 +18,86 @@ application.config.from_object(Configuration)
 jwt = JWTManager(application)
 
 
-def validateSearchRequest():
-    jwtToken = get_jwt()
-    if jwtToken["roleId"] != "1":
-        return "Missing Authorization Header", 401
-    return "", 0
+@application.route("/search", methods=["GET"])
+@jwt_required()
+@roleCheck(CUSTOMER_ROLE_ID_STRING)
+def search():
+    return jsonify(getSearchResult()), 200
+
+
+@application.route("/order", methods=["POST"])
+@jwt_required()
+@roleCheck(CUSTOMER_ROLE_ID_STRING)
+def order():
+    requests, errorMessage, errorCode, customerEthereumAddress = validateOrderRequest()
+    if len(errorMessage) > 0:
+        return jsonify(message=errorMessage), errorCode
+
+    newOrder = insertOrder(requests, customerEthereumAddress)
+    response = insertProductOrder(requests, newOrder)
+
+    return jsonify(response), 200
+
+
+@application.route("/status", methods=["GET"])
+@jwt_required()
+@roleCheck(CUSTOMER_ROLE_ID_STRING)
+def status():
+    return jsonify(getOrderStatuses()), 200
+
+
+@application.route("/delivered", methods=["POST"])
+@jwt_required()
+@roleCheck(CUSTOMER_ROLE_ID_STRING)
+def delivered():
+    errorMessage, errorCode, orderForDeliveryConfirmation = validateDeliveredRequest()
+    if len(errorMessage) > 0:
+        return jsonify(message=errorMessage), errorCode
+
+    confirmOrderDelivery(orderForDeliveryConfirmation)
+
+    return Response(status=200)
+
+
+@application.route("/pay", methods=["POST"])
+@jwt_required()
+@roleCheck(CUSTOMER_ROLE_ID_STRING)
+def pay():
+    errorMessage, errorCode, orderForPayment, ethereumKeys, ethereumPassphrase = validatePayRequest()
+    if len(errorMessage) > 0:
+        return jsonify(message=errorMessage), errorCode
+
+    try:
+        # pokusaj dohvatanja adrese i desifrovanja privatnog kljuca
+        customerEthereumAddress = web3.to_checksum_address(ethereumKeys["address"])
+        customerEthereumPrivateKey = Account.decrypt(ethereumKeys, ethereumPassphrase).hex()
+        try:
+            # dovhatanje deploy-ovanog pametnog ugovora sa blockchaina
+            ethereumContractDeployed = web3.eth.contract(
+                address=orderForPayment.ethereumContractAddress,
+                abi=abi
+            )
+            # radi vezbe cu koristiti build_transaction() metodu i eksplicitno potpisati transakciju, a jednostavniji
+            # nacin bi bio koriscenje transact() metode jer se tu potpisivanje transakcije dogadja implicitno na osnovu
+            # ethereum adrese naloga
+            transaction = ethereumContractDeployed.functions.customerPayOrder(orderForPayment.id).build_transaction({
+                "from": customerEthereumAddress,  # receno u tekstu da kupac snosi troskove ovog transfera novca
+                "value": ceil(orderForPayment.totalOrderPrice),
+                "nonce": web3.eth.get_transaction_count(customerEthereumAddress),
+                "gasPrice": 21000
+            })
+            signedTransaction = web3.eth.account.sign_transaction(transaction, customerEthereumPrivateKey)
+            transactionHash = web3.eth.send_raw_transaction(signedTransaction.rawTransaction)
+            web3.eth.wait_for_transaction_receipt(transactionHash)
+        except ContractLogicError as contractLogicError:
+            # placanje porudzbine nije uspelo
+            contractLogicErrorString = str(contractLogicError)
+            return jsonify(message=contractLogicErrorString[contractLogicErrorString.find("revert ") + 7:]), 400
+    except ValueError:
+        # desifrovanje kljuceva nije uspelo
+        return jsonify(message="Invalid credentials."), 400
+
+    return Response(status=200)
 
 
 def getSearchResult():
@@ -60,10 +138,6 @@ def getSearchResult():
 
 
 def validateOrderRequest():
-    jwtToken = get_jwt()
-    if jwtToken["roleId"] != "1":
-        return None, "Missing Authorization Header", 401, None
-
     requests = request.json.get("requests", "null")
     if requests == "null":
         return None, "Field requests is missing.", 400, None
@@ -165,13 +239,6 @@ def insertProductOrder(requests, newOrder):
     return {"id": newOrder.id}
 
 
-def validateStatusRequest():
-    jwtToken = get_jwt()
-    if jwtToken["roleId"] != "1":
-        return "Missing Authorization Header", 401
-    return "", 0
-
-
 def getOrderStatuses():
     orders = database.session.query(
         Order.id.label("OrderId"),
@@ -238,10 +305,6 @@ def getOrderStatuses():
 
 
 def validateDeliveredRequest():
-    jwtToken = get_jwt()
-    if jwtToken["roleId"] != "1":
-        return "Missing Authorization Header", 401, None
-
     orderId = request.json.get("id", None)
     if orderId is None:
         return "Missing order id.", 400, None
@@ -284,7 +347,8 @@ def validateDeliveredRequest():
             web3.eth.wait_for_transaction_receipt(transactionHash)
         except ContractLogicError as contractLogicError:
             # transfer novca vlasniku i kuriru nije uspeo
-            return str(contractLogicError)[str(contractLogicError).find("revert ") + 7:], 400, None
+            contractLogicErrorString = str(contractLogicError)
+            return contractLogicErrorString[contractLogicErrorString.find("revert ") + 7:], 400, None
     except ValueError:
         # desifrovanje kljuceva nije uspelo
         return "Invalid credentials.", 400, None
@@ -298,9 +362,6 @@ def confirmOrderDelivery(orderForDeliveryConfirmation):
 
 
 def validatePayRequest():
-    jwtToken = get_jwt()
-    if jwtToken["roleId"] != "1":
-        return "Missing Authorization Header", 401, None, None, None
     orderId = request.json.get("id", None)
     if orderId is None:
         return "Missing order id.", 400, None, None, None
@@ -319,96 +380,6 @@ def validatePayRequest():
         return "Missing passphrase.", 400, None, None, None
     ethereumKeys = json.loads(ethereumKeys.replace("'", '"').replace('\n', '').replace(' ', ''))
     return "", 0, orderForPayment, ethereumKeys, ethereumPassphrase
-
-
-@application.route("/search", methods=["GET"])
-@jwt_required()
-def search():
-    errorMessage, errorCode = validateSearchRequest()
-    if len(errorMessage) > 0:
-        return jsonify(msg=errorMessage), errorCode
-
-    return jsonify(getSearchResult()), 200
-
-
-@application.route("/order", methods=["POST"])
-@jwt_required()
-def order():
-    requests, errorMessage, errorCode, customerEthereumAddress = validateOrderRequest()
-    if errorCode == 401:
-        return jsonify(msg=errorMessage), errorCode
-    if len(errorMessage) > 0:
-        return jsonify(message=errorMessage), errorCode
-
-    newOrder = insertOrder(requests, customerEthereumAddress)
-    response = insertProductOrder(requests, newOrder)
-
-    return jsonify(response), 200
-
-
-@application.route("/status", methods=["GET"])
-@jwt_required()
-def status():
-    errorMessage, errorCode = validateStatusRequest()
-    if len(errorMessage) > 0:
-        return jsonify(msg=errorMessage), errorCode
-
-    return jsonify(getOrderStatuses()), 200
-
-
-@application.route("/delivered", methods=["POST"])
-@jwt_required()
-def delivered():
-    errorMessage, errorCode, orderForDeliveryConfirmation = validateDeliveredRequest()
-    if errorCode == 401:
-        return jsonify(msg=errorMessage), errorCode
-    if len(errorMessage) > 0:
-        return jsonify(message=errorMessage), errorCode
-
-    confirmOrderDelivery(orderForDeliveryConfirmation)
-
-    return Response(status=200)
-
-
-@application.route("/pay", methods=["POST"])
-@jwt_required()
-def pay():
-    errorMessage, errorCode, orderForPayment, ethereumKeys, ethereumPassphrase = validatePayRequest()
-    if errorCode == 401:
-        return jsonify(msg=errorMessage), errorCode
-    if len(errorMessage) > 0:
-        return jsonify(message=errorMessage), errorCode
-
-    try:
-        # pokusaj dohvatanja adrese i desifrovanja privatnog kljuca
-        customerEthereumAddress = web3.to_checksum_address(ethereumKeys["address"])
-        customerEthereumPrivateKey = Account.decrypt(ethereumKeys, ethereumPassphrase).hex()
-        try:
-            # dovhatanje deploy-ovanog pametnog ugovora sa blockchaina
-            ethereumContractDeployed = web3.eth.contract(
-                address=orderForPayment.ethereumContractAddress,
-                abi=abi
-            )
-            # radi vezbe cu koristiti build_transaction() metodu i eksplicitno potpisati transakciju, a jednostavniji
-            # nacin bi bio koriscenje transact() metode jer se tu potpisivanje transakcije dogadja implicitno na osnovu
-            # ethereum adrese naloga
-            transaction = ethereumContractDeployed.functions.customerPayOrder(orderForPayment.id).build_transaction({
-                "from": customerEthereumAddress,  # receno u tekstu da kupac snosi troskove ovog transfera novca
-                "value": ceil(orderForPayment.totalOrderPrice),
-                "nonce": web3.eth.get_transaction_count(customerEthereumAddress),
-                "gasPrice": 21000
-            })
-            signedTransaction = web3.eth.account.sign_transaction(transaction, customerEthereumPrivateKey)
-            transactionHash = web3.eth.send_raw_transaction(signedTransaction.rawTransaction)
-            web3.eth.wait_for_transaction_receipt(transactionHash)
-        except ContractLogicError as contractLogicError:
-            # placanje porudzbine nije uspelo
-            return jsonify(message=str(contractLogicError)[str(contractLogicError).find("revert ") + 7:]), 400
-    except ValueError:
-        # desifrovanje kljuceva nije uspelo
-        return jsonify(message="Invalid credentials."), 400
-
-    return Response(status=200)
 
 
 if __name__ == "__main__":

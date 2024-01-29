@@ -1,9 +1,10 @@
 from flask import Flask, request, jsonify, Response
 from configuration import Configuration
 from models import database, Product, Category, ProductCategory
-from flask_jwt_extended import JWTManager, jwt_required, get_jwt
+from flask_jwt_extended import JWTManager, jwt_required
 from requests import request as httpRequest
 import json
+from decorators import roleCheck
 
 OWNER_ROLE_ID_STRING = "2"
 
@@ -11,6 +12,47 @@ application = Flask(__name__)
 application.config.from_object(Configuration)
 
 jwt = JWTManager(application)
+
+
+@application.route("/update", methods=["POST"])
+@jwt_required()
+@roleCheck(OWNER_ROLE_ID_STRING)
+def update():
+    errorMessage, errorCode = validateUpdateRequest()
+    if len(errorMessage) > 0:
+        return jsonify(message=errorMessage), errorCode
+
+    productCategoriesDictionary, errorMessage, errorCode = processFile(request)
+    if len(errorMessage) > 0:
+        return jsonify(message=errorMessage), errorCode
+
+    productCategoriesDictionary = insertProducts(productCategoriesDictionary)
+    productCategoriesDictionary = insertCategories(productCategoriesDictionary)
+    insertProductCategories(productCategoriesDictionary)
+
+    return Response(status=200)
+
+
+@application.route("/product_statistics", methods=["GET"])
+@jwt_required()
+@roleCheck(OWNER_ROLE_ID_STRING)
+def product_statistics():
+    response = httpRequest(
+        method="get",
+        url="http://sparkApplication:5004/product_statistics"
+    )
+    return jsonify(json.loads(response.text)), 200
+
+
+@application.route("/category_statistics", methods=["GET"])
+@jwt_required()
+@roleCheck(OWNER_ROLE_ID_STRING)
+def category_statistics():
+    response = httpRequest(
+        method="get",
+        url="http://sparkApplication:5004/category_statistics"
+    )
+    return jsonify(json.loads(response.text)), 200
 
 
 def isFloat(stringRepresentation):
@@ -112,74 +154,9 @@ def processFile(postRequestBody):
 
 
 def validateUpdateRequest():
-    jwtToken = get_jwt()
-    if jwtToken["roleId"] != OWNER_ROLE_ID_STRING:
-        return "Missing Authorization Header", 401
     if "file" not in request.files:
         return "Field file missing.", 400
     return "", 0
-
-
-def validateProductStatisticsRequest():
-    jwtToken = get_jwt()
-    if jwtToken["roleId"] != OWNER_ROLE_ID_STRING:
-        return "Missing Authorization Header", 401
-    return "", 0
-
-
-def validateCategoryStatisticsRequest():
-    jwtToken = get_jwt()
-    if jwtToken["roleId"] != OWNER_ROLE_ID_STRING:
-        return "Missing Authorization Header", 401
-    return "", 0
-
-
-@application.route("/update", methods=["POST"])
-@jwt_required()
-def update():
-    errorMessage, errorCode = validateUpdateRequest()
-    if len(errorMessage) > 0 and errorCode == 400:
-        return jsonify(message=errorMessage), errorCode
-    if len(errorMessage) > 0 and errorCode == 401:
-        return jsonify(msg=errorMessage), errorCode
-
-    productCategoriesDictionary, errorMessage, errorCode = processFile(request)
-    if len(errorMessage) > 0:
-        return jsonify(message=errorMessage), errorCode
-
-    productCategoriesDictionary = insertProducts(productCategoriesDictionary)
-    productCategoriesDictionary = insertCategories(productCategoriesDictionary)
-    insertProductCategories(productCategoriesDictionary)
-
-    return Response(status=200)
-
-
-@application.route("/product_statistics", methods=["GET"])
-@jwt_required()
-def product_statistics():
-    errorMessage, errorCode = validateProductStatisticsRequest()
-    if len(errorMessage) > 0:
-        return jsonify(msg=errorMessage), errorCode
-
-    response = httpRequest(
-        method="get",
-        url="http://sparkApplication:5004/product_statistics"
-    )
-    return jsonify(json.loads(response.text)), 200
-
-
-@application.route("/category_statistics", methods=["GET"])
-@jwt_required()
-def category_statistics():
-    errorMessage, errorCode = validateCategoryStatisticsRequest()
-    if len(errorMessage) > 0:
-        return jsonify(msg=errorMessage), errorCode
-
-    response = httpRequest(
-        method="get",
-        url="http://sparkApplication:5004/category_statistics"
-    )
-    return jsonify(json.loads(response.text)), 200
 
 
 if __name__ == "__main__":
