@@ -12,7 +12,7 @@ web3 = Web3(HTTPProvider("http://ganache:8545"))
 bytecode = readFile("./blockchain/output/Order.bin")
 abi = readFile("./blockchain/output/Order.abi")
 ethereumContract = web3.eth.contract(bytecode=bytecode, abi=abi)
-ownerEthereumAccount = web3.eth.accounts[0]  # receno u tekstu da prvi racun treba dodeliti vlasniku prodavnice
+ownerEthereumAddress = web3.eth.accounts[0]  # receno u tekstu da prvi racun treba dodeliti vlasniku prodavnice
 
 
 class Configuration:

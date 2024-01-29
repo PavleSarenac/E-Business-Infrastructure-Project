@@ -1,7 +1,8 @@
 from flask import Flask, request, jsonify, Response
-from configuration import Configuration
+from configuration import Configuration, web3, abi, ownerEthereumAddress
 from models import database, Order
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt
+from web3.exceptions import ContractLogicError
 
 application = Flask(__name__)
 application.config.from_object(Configuration)
@@ -41,6 +42,22 @@ def validatePickUpOrderRequest():
         return "Invalid order id.", 400, None
     if orderForPickUp.orderStatus == "PENDING" or orderForPickUp.orderStatus == "COMPLETE":
         return "Invalid order id.", 400, None
+    ethereumCourierAddress = request.json.get("address", None)
+    if ethereumCourierAddress is None or ethereumCourierAddress == "":
+        return "Missing address.", 400, None
+    if not web3.is_address(ethereumCourierAddress):
+        return "Invalid address.", 400, None
+
+    ethereumContractDeployed = web3.eth.contract(address=orderForPickUp.ethereumContractAddress, abi=abi)
+    try:
+        transactionHash = ethereumContractDeployed.functions.courierPickUpOrder(
+            ethereumCourierAddress, orderId
+        ).transact({
+            "from": ownerEthereumAddress  # receno u tekstu da vlasnik snosi troskove vezivanja kurira za ugovor
+        })
+        web3.eth.wait_for_transaction_receipt(transactionHash)
+    except ContractLogicError as contractLogicError:
+        return str(contractLogicError)[str(contractLogicError).find("revert ") + 7:], 400, None
 
     return "", 0, orderForPickUp
 
